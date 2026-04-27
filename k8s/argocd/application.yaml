@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/know-me-tools/rsky
+    repoURL: https://github.com/GQAdonis/rsky
     targetRevision: main
     path: k8s
     directory:

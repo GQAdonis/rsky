@@ -134,6 +134,21 @@ jobs:
             --docker-password=${{ secrets.GHCR_PAT }} \
             --dry-run=client -o yaml | kubectl apply -f -
 
+      - name: Register ArgoCD repository credential
+        run: |
+          kubectl create secret generic argocd-repo-know-me-rsky \
+            --namespace argocd \
+            --from-literal=type=git \
+            --from-literal=url=https://github.com/GQAdonis/rsky \
+            --from-literal=username=x-access-token \
+            --from-literal=password=${{ secrets.GHCR_PAT }} \
+            --dry-run=client -o yaml \
+          | kubectl annotate --local -f - \
+              managed-by=argocd-cm -o yaml \
+          | kubectl label --local -f - \
+              argocd.argoproj.io/secret-type=repository -o yaml \
+          | kubectl apply -f -
+
       - name: Apply StorageClass
         run: kubectl apply -f k8s/postgresql/storageclass.yaml
 
