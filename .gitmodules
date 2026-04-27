@@ -3,4 +3,4 @@
 	url = https://github.com/DavidBuchanan314/mst-test-suite
 [submodule "web-client"]
 	path = web-client
-	url = https://github.com/sudoWright/ouranos_atproto
+	url = git@github.com:Know-Me-Tools/ouranos.git
