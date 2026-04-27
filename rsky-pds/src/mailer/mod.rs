@@ -39,8 +39,8 @@ async fn send_via_resend(from: &str, to: &str, subject: &str, html: &str) -> Res
 
 fn sender() -> String {
     let name = env::var("PDS_EMAIL_FROM_NAME").unwrap_or_else(|_| "rsky PDS".to_string());
-    let addr =
-        env::var("PDS_EMAIL_FROM_ADDRESS").unwrap_or_else(|_| "noreply@pds.know-me.tools".to_string());
+    let addr = env::var("PDS_EMAIL_FROM_ADDRESS")
+        .unwrap_or_else(|_| "noreply@pds.know-me.tools".to_string());
     format!("{name} <{addr}>")
 }
 
