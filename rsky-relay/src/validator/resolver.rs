@@ -70,6 +70,17 @@ impl Resolver {
             Connection::open_with_flags("plc_directory.db", flag | OpenFlags::SQLITE_OPEN_CREATE)?;
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
         conn.execute_batch("PRAGMA journal_mode = WAL; PRAGMA wal_autocheckpoint = 1000;")?;
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS plc_operations (
+                cid TEXT NOT NULL,
+                did TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                nullified INTEGER NOT NULL DEFAULT 0,
+                operation BLOB NOT NULL,
+                PRIMARY KEY (cid)
+            );
+            CREATE INDEX IF NOT EXISTS plc_ops_created_at ON plc_operations (created_at DESC);",
+        )?;
         if *DO_PLC_EXPORT {
             match conn.execute("PRAGMA secure_delete = OFF", []) {
                 Ok(_) | Err(rusqlite::Error::ExecuteReturnedResults) => {}
