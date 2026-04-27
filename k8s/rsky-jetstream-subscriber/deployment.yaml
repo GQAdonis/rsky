@@ -19,7 +19,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: rsky-jetstream-subscriber
-          image: ghcr.io/know-me-tools/rsky-jetstream-subscriber:IMAGE_TAG
+          image: ghcr.io/know-me-tools/rsky-jetstream-subscriber:8d7bb44
           envFrom:
             - configMapRef:
                 name: rsky-jetstream-subscriber-config
