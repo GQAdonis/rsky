@@ -5567,18 +5567,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mailgun-rs"
-version = "0.1.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7ce77c6c4195bac30129f854bdff000dee52dddaa7913b6c73df7e7f062398d"
-dependencies = [
- "reqwest 0.11.27",
- "serde",
- "serde_json",
- "typed-builder",
-]
-
-[[package]]
 name = "malloc_buf"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8195,7 +8183,6 @@ dependencies = [
  "jwt-simple",
  "lazy_static",
  "mailchecker",
- "mailgun-rs",
  "rand 0.8.5",
  "rand_core 0.6.4",
  "regex",
@@ -10541,26 +10528,6 @@ dependencies = [
  "url",
  "utf-8",
  "webpki-roots 0.26.11",
-]
-
-[[package]]
-name = "typed-builder"
-version = "0.15.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fe83c85a85875e8c4cb9ce4a890f05b23d38cd0d47647db7895d3d2a79566d2"
-dependencies = [
- "typed-builder-macro",
-]
-
-[[package]]
-name = "typed-builder-macro"
-version = "0.15.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29a3151c41d0b13e3d011f98adc24434560ef06673a155a6c7f66b9879eecce2"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.106",
 ]
 
 [[package]]
