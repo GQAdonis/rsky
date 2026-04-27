@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-initdb
+  namespace: atproto
+data:
+  init.sql: |
+    -- Create databases for each ATProto service (idempotent)
+    SELECT 'CREATE DATABASE rsky'
+      WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'rsky')\gexec
+
+    SELECT 'CREATE DATABASE rsky_feedgen'
+      WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'rsky_feedgen')\gexec
+
+    \c rsky
+    CREATE EXTENSION IF NOT EXISTS vector;
+
+    \c rsky_feedgen
+    CREATE EXTENSION IF NOT EXISTS vector;

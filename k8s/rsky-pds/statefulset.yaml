@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rsky-pds
+  namespace: atproto
+  labels:
+    app: rsky-pds
+spec:
+  serviceName: rsky-pds
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rsky-pds
+  template:
+    metadata:
+      labels:
+        app: rsky-pds
+    spec:
+      containers:
+        - name: rsky-pds
+          image: ghcr.io/know-me-tools/rsky-pds:IMAGE_TAG
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: rsky-pds-config
+            - secretRef:
+                name: rsky-pds-secrets
+          volumeMounts:
+            - name: rsky-pds-data
+              mountPath: /app/data
+          livenessProbe:
+            httpGet:
+              path: /xrpc/_health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /xrpc/_health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 2
+              memory: 1Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: rsky-pds-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: atproto-ssd-immediate
+        resources:
+          requests:
+            storage: 10Gi

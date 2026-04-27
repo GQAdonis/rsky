@@ -1,0 +1,59 @@
+{
+  "phase": "phase-0-foundation",
+  "last_updated": "2026-04-27T00:00:00Z",
+  "last_updated_by": "claude-code",
+  "assessment_complete": true,
+  "plan_complete": true,
+  "changes": {
+    "p0-c001": {
+      "status": "DONE",
+      "tasks_total": 7,
+      "tasks_done": 7,
+      "last_task_completed": "Rewrite rsky-jetstream-subscriber/Dockerfile",
+      "next_task_pending": null,
+      "started_by": "claude-code",
+      "completed_by": "claude-code",
+      "blockers": []
+    },
+    "p0-c002": {
+      "status": "DONE",
+      "tasks_total": 6,
+      "tasks_done": 6,
+      "last_task_completed": "Create k8s/postgresql/service.yaml",
+      "next_task_pending": null,
+      "started_by": "claude-code",
+      "completed_by": "claude-code",
+      "blockers": []
+    },
+    "p0-c003": {
+      "status": "DONE",
+      "tasks_total": 10,
+      "tasks_done": 10,
+      "last_task_completed": "Create k8s/rsky-pds/httproute-redirect.yaml",
+      "next_task_pending": null,
+      "started_by": "claude-code",
+      "completed_by": "claude-code",
+      "blockers": []
+    },
+    "p0-c004": {
+      "status": "DONE",
+      "tasks_total": 10,
+      "tasks_done": 10,
+      "last_task_completed": "Create k8s/web-client/httproute-redirect.yaml",
+      "next_task_pending": null,
+      "started_by": "claude-code",
+      "completed_by": "claude-code",
+      "blockers": []
+    },
+    "p0-c005": {
+      "status": "DONE",
+      "tasks_total": 9,
+      "tasks_done": 9,
+      "last_task_completed": "Create k8s/README.md",
+      "next_task_pending": null,
+      "started_by": "claude-code",
+      "completed_by": "claude-code",
+      "blockers": []
+    }
+  }
+}

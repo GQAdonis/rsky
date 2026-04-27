@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rsky-pds-config
+  namespace: atproto
+data:
+  PDS_HOSTNAME: "pds.know-me.tools"
+  PDS_SERVICE_DID: "did:web:pds.know-me.tools"
+  PDS_SERVICE_HANDLE_DOMAINS: ".know-me.tools"
+  PDS_EMAIL_FROM_ADDRESS: "noreply@know-me.tools"
+  PDS_EMAIL_FROM_NAME: "know-me.tools"
+  PDS_CRAWLERS: "https://bsky.network"
+  ROCKET_PORT: "3000"
+  ROCKET_ADDRESS: "0.0.0.0"
+  AWS_ENDPOINT_URL: "https://storage.googleapis.com"
+  AWS_DEFAULT_REGION: "auto"

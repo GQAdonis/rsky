@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-client
+  namespace: atproto
+  labels:
+    app: web-client
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-client
+  template:
+    metadata:
+      labels:
+        app: web-client
+    spec:
+      containers:
+        - name: web-client
+          image: ghcr.io/know-me-tools/web-client:IMAGE_TAG
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: web-client-config
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rsky-labeler
+  namespace: atproto
+  labels:
+    app: rsky-labeler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rsky-labeler
+  template:
+    metadata:
+      labels:
+        app: rsky-labeler
+    spec:
+      containers:
+        - name: rsky-labeler
+          image: ghcr.io/know-me-tools/rsky-labeler:IMAGE_TAG
+          envFrom:
+            - configMapRef:
+                name: rsky-labeler-config
+            - secretRef:
+                name: rsky-labeler-secrets
+          livenessProbe:
+            exec:
+              command:
+                - pgrep
+                - -x
+                - rsky-labeler
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

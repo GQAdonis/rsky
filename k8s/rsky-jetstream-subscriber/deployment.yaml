@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rsky-jetstream-subscriber
+  namespace: atproto
+  labels:
+    app: rsky-jetstream-subscriber
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rsky-jetstream-subscriber
+  template:
+    metadata:
+      labels:
+        app: rsky-jetstream-subscriber
+    spec:
+      containers:
+        - name: rsky-jetstream-subscriber
+          image: ghcr.io/know-me-tools/rsky-jetstream-subscriber:IMAGE_TAG
+          envFrom:
+            - configMapRef:
+                name: rsky-jetstream-subscriber-config
+            - secretRef:
+                name: rsky-jetstream-subscriber-secrets
+          livenessProbe:
+            exec:
+              command:
+                - pgrep
+                - -x
+                - rsky-jetstream-sub
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

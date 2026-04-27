@@ -1,0 +1,13 @@
+{
+  "active_phase": "phase-2-commit-and-deploy",
+  "backend": "openspec",
+  "phase_status": "PLANNED",
+  "last_completed_change": null,
+  "next_pending_change": "p2-c001",
+  "preferred_re_entry_skill": "kbd-execute",
+  "exact_next_command": "/kbd-execute phase-2-commit-and-deploy",
+  "fallback_command": "/kbd-plan phase-2-commit-and-deploy",
+  "last_updated": "2026-04-27T00:00:00Z",
+  "last_updated_by": "claude-code",
+  "notes": "phase-2-commit-and-deploy ASSESSED. Gaps: web-client submodule missing (G-001, BLOCKER), all phases 0+1 work uncommitted (G-002), GitHub secrets not seeded (G-003), ArgoCD not bootstrapped (G-004), DNS not configured (G-005). Automatable: p2-c001 (submodule), p2-c002 (commit). Human tasks: p2-c003..p2-c007 (secrets, ArgoCD, push, DNS, smoke test)."
+}

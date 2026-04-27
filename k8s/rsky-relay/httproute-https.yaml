@@ -1,0 +1,19 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: rsky-relay-https
+  namespace: atproto
+spec:
+  parentRefs:
+    - name: relay-gateway
+      sectionName: https
+  hostnames:
+    - relay.know-me.tools
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: rsky-relay
+          port: 9000

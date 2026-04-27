@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rsky-jetstream-subscriber-config
+  namespace: atproto
+data:
+  JETSTREAM_SERVER_ENDPOINT: "wss://jetstream1.us-west.bsky.network"
+  FEEDGEN_QUEUE_ENDPOINT: "http://rsky-feedgen:3000"
+  FILTER_PARAM: ""

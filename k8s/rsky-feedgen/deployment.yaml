@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rsky-feedgen
+  namespace: atproto
+  labels:
+    app: rsky-feedgen
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rsky-feedgen
+  template:
+    metadata:
+      labels:
+        app: rsky-feedgen
+    spec:
+      containers:
+        - name: rsky-feedgen
+          image: ghcr.io/know-me-tools/rsky-feedgen:IMAGE_TAG
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: rsky-feedgen-config
+            - secretRef:
+                name: rsky-feedgen-secrets
+          readinessProbe:
+            tcpSocket:
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket:
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi

@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rsky-relay
+  namespace: atproto
+  labels:
+    app: rsky-relay
+spec:
+  serviceName: rsky-relay
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rsky-relay
+  template:
+    metadata:
+      labels:
+        app: rsky-relay
+    spec:
+      containers:
+        - name: rsky-relay
+          image: ghcr.io/know-me-tools/rsky-relay:IMAGE_TAG
+          ports:
+            - name: http
+              containerPort: 9000
+          envFrom:
+            - secretRef:
+                name: rsky-relay-secrets
+          livenessProbe:
+            httpGet:
+              path: /_health
+              port: 9000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /_health
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "4"
+              memory: 4Gi
+          volumeMounts:
+            - name: rsky-relay-data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: rsky-relay-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: atproto-ssd-immediate
+        resources:
+          requests:
+            storage: 100Gi

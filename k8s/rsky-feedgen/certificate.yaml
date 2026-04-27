@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: feed-know-me-tools-tls
+  namespace: atproto
+spec:
+  secretName: feed-know-me-tools-tls
+  issuerRef:
+    name: letsencrypt
+    kind: ClusterIssuer
+  dnsNames:
+    - feed.know-me.tools

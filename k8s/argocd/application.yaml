@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: atproto-stack
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/know-me-tools/rsky
+    targetRevision: main
+    path: k8s
+    directory:
+      recurse: true
+      exclude: "argocd/**"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: atproto
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

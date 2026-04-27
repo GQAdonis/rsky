@@ -1,0 +1,19 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: rsky-pds-https
+  namespace: atproto
+spec:
+  parentRefs:
+    - name: pds-gateway
+      sectionName: https
+  hostnames:
+    - pds.know-me.tools
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: rsky-pds
+          port: 3000

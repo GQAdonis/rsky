@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rsky-labeler-config
+  namespace: atproto
+data:
+  FEEDGEN_SUBSCRIPTION_PATH: "wss://bsky.network"
+  FEEDGEN_SUBSCRIPTION_ENDPOINT: "com.atproto.sync.subscribeRepos"
+  BSKY_AGENT_URL: "https://bsky.social"
+  MOD_SERVICE_LABEL: "antiblack-harassment"
+  MOD_SERVICE_LABEL_REASON: "Explicit slur filter"
+  MOD_SERVICE_REASON: "com.atproto.moderation.defs#reasonRude"
+  MOD_SERVICE_COMMENT: "Explicit slur filter"
+  # Standby mode: all actions disabled until labeler credentials are configured.
+  # To activate: set these to "true" and populate MOD_SERVICE_* secrets.
+  ENABLE_CREATE_REPORT: "false"
+  ENABLE_CREATE_LABEL: "false"
+  ENABLE_CREATE_TAG: "false"

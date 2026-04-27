@@ -1,0 +1,244 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io/know-me-tools
+  GKE_CLUSTER: client-cluster
+  GKE_REGION: us-central1
+
+jobs:
+  build-and-push:
+    name: Build ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: rsky-pds
+            dockerfile: rsky-pds/Dockerfile
+          - service: rsky-feedgen
+            dockerfile: rsky-feedgen/Dockerfile
+          - service: rsky-labeler
+            dockerfile: rsky-labeler/Dockerfile
+          - service: rsky-jetstream-subscriber
+            dockerfile: rsky-jetstream-subscriber/Dockerfile
+          - service: rsky-relay
+            dockerfile: rsky-relay/Dockerfile
+          - service: web-client
+            dockerfile: Dockerfile.web-client
+    outputs:
+      sha: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ matrix.service }}
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          build-args: |
+            NEXT_PUBLIC_ATP_SERVICE_URL=https://pds.know-me.tools
+            NEXT_PUBLIC_ATP_APPVIEW_URL=https://api.bsky.app
+
+  update-image-tags:
+    name: Update image tags in k8s manifests
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GHCR_PAT }}
+
+      - name: Update image tags
+        run: |
+          SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          bash .github/scripts/update-image-tags.sh "$SHA"
+
+      - name: Commit updated tags
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add k8s/
+          git diff --staged --quiet || git commit -m "chore: update image tags to ${{ github.sha }} [skip ci]"
+          git push
+
+  inject-secrets:
+    name: Inject secrets into cluster
+    runs-on: ubuntu-latest
+    needs: update-image-tags
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GKE_SA_KEY }}
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GKE_REGION }}
+          project_id: ${{ secrets.GKE_PROJECT_ID }}
+
+      - name: Ensure namespace exists
+        run: kubectl apply -f k8s/namespace.yaml
+
+      - name: Create GHCR pull secret
+        run: |
+          kubectl create secret docker-registry ghcr-pull-secret \
+            --namespace atproto \
+            --docker-server=ghcr.io \
+            --docker-username=${{ github.actor }} \
+            --docker-password=${{ secrets.GHCR_PAT }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply StorageClass
+        run: kubectl apply -f k8s/postgresql/storageclass.yaml
+
+      - name: Inject PostgreSQL secret
+        env:
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: rsky
+        run: |
+          envsubst < k8s/postgresql/secret.yaml | kubectl apply -f -
+
+      - name: Inject rsky-pds secret
+        env:
+          PDS_ADMIN_PASS: ${{ secrets.PDS_ADMIN_PASS }}
+          PDS_JWT_KEY_K256_PRIVATE_KEY_HEX: ${{ secrets.PDS_JWT_KEY_K256_PRIVATE_KEY_HEX }}
+          PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX: ${{ secrets.PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX }}
+          PDS_REPO_SIGNING_KEY_K256_PRIVATE_KEY_HEX: ${{ secrets.PDS_REPO_SIGNING_KEY_K256_PRIVATE_KEY_HEX }}
+          PDS_MAILGUN_API_KEY: ${{ secrets.PDS_MAILGUN_API_KEY }}
+          PDS_MAILGUN_DOMAIN: ${{ secrets.PDS_MAILGUN_DOMAIN }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          GCS_HMAC_ACCESS_KEY: ${{ secrets.GCS_HMAC_ACCESS_KEY }}
+          GCS_HMAC_SECRET_KEY: ${{ secrets.GCS_HMAC_SECRET_KEY }}
+          GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
+        run: |
+          envsubst < k8s/rsky-pds/secret.yaml | kubectl apply -f -
+
+      - name: Inject rsky-relay secret
+        env:
+          RELAY_ADMIN_PASSWORD: ${{ secrets.RELAY_ADMIN_PASSWORD }}
+        run: |
+          envsubst < k8s/rsky-relay/secret.yaml | kubectl apply -f -
+
+      - name: Inject rsky-feedgen secret
+        env:
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          RSKY_API_KEY: ${{ secrets.RSKY_API_KEY }}
+        run: |
+          envsubst < k8s/rsky-feedgen/secret.yaml | kubectl apply -f -
+
+      - name: Inject rsky-labeler secret
+        env:
+          MOD_SERVICE_DID: ${{ secrets.MOD_SERVICE_DID }}
+          MOD_SERVICE_EMAIL: ${{ secrets.MOD_SERVICE_EMAIL }}
+          MOD_SERVICE_PASSWORD: ${{ secrets.MOD_SERVICE_PASSWORD }}
+        run: |
+          envsubst < k8s/rsky-labeler/secret.yaml | kubectl apply -f -
+
+      - name: Inject rsky-jetstream-subscriber secret
+        env:
+          RSKY_API_KEY: ${{ secrets.RSKY_API_KEY }}
+        run: |
+          envsubst < k8s/rsky-jetstream-subscriber/secret.yaml | kubectl apply -f -
+
+  verify-sync:
+    name: Verify ArgoCD sync
+    runs-on: ubuntu-latest
+    needs: inject-secrets
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GKE_SA_KEY }}
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GKE_REGION }}
+          project_id: ${{ secrets.GKE_PROJECT_ID }}
+
+      - name: Wait for ArgoCD sync
+        run: |
+          kubectl wait --for=condition=Synced application/atproto-stack \
+            -n argocd --timeout=300s || true
+          kubectl wait --for=condition=Healthy application/atproto-stack \
+            -n argocd --timeout=300s
+
+      - name: Verify rollouts
+        run: |
+          kubectl rollout status statefulset/rsky-pds -n atproto --timeout=120s
+          kubectl rollout status statefulset/rsky-relay -n atproto --timeout=120s
+          kubectl rollout status deployment/rsky-feedgen -n atproto --timeout=120s
+
+      - name: Print DNS instructions
+        run: |
+          echo "=== Cloudflare DNS Setup ==="
+          echo "Set these A records (DNS only / grey cloud for cert issuance):"
+          echo ""
+          PDS_IP=$(kubectl get gateway pds-gateway -n atproto \
+            -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || echo "<pending>")
+          RELAY_IP=$(kubectl get gateway relay-gateway -n atproto \
+            -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || echo "<pending>")
+          FEED_IP=$(kubectl get gateway feedgen-gateway -n atproto \
+            -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || echo "<pending>")
+          WEB_IP=$(kubectl get gateway web-client-gateway -n atproto \
+            -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || echo "<pending>")
+          echo "  pds.know-me.tools     →  $PDS_IP"
+          echo "  relay.know-me.tools   →  $RELAY_IP"
+          echo "  feed.know-me.tools    →  $FEED_IP"
+          echo "  social.know-me.tools  →  $WEB_IP"
