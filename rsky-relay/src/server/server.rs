@@ -154,7 +154,7 @@ impl Server {
             None
         };
 
-        let listener = TcpListener::bind(format!("127.0.0.1:{PORT}"))?;
+        let listener = TcpListener::bind(format!("0.0.0.0:{PORT}"))?;
         listener.set_nonblocking(true)?;
         let base_url = Url::parse("http://example.com")?;
         let now = Instant::now();
