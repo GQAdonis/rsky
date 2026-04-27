@@ -5,6 +5,7 @@ SHA="${1:?SHA argument required}"
 
 SERVICES=(
   "rsky-pds"
+  "rsky-relay"
   "rsky-feedgen"
   "rsky-labeler"
   "rsky-jetstream-subscriber"

@@ -20,7 +20,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: rsky-relay
-          image: ghcr.io/know-me-tools/rsky-relay:IMAGE_TAG
+          image: ghcr.io/know-me-tools/rsky-relay:8d7bb44
           ports:
             - name: http
               containerPort: 9000
