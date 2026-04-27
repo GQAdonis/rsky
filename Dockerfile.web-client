@@ -1,0 +1,30 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY web-client/package*.json ./
+RUN npm ci
+
+COPY web-client/ .
+
+ARG NEXT_PUBLIC_ATP_SERVICE_URL=https://pds.know-me.tools
+ARG NEXT_PUBLIC_ATP_APPVIEW_URL=https://api.bsky.app
+ENV NEXT_PUBLIC_ATP_SERVICE_URL=$NEXT_PUBLIC_ATP_SERVICE_URL
+ENV NEXT_PUBLIC_ATP_APPVIEW_URL=$NEXT_PUBLIC_ATP_APPVIEW_URL
+
+RUN npm run build
+
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+
+LABEL org.opencontainers.image.source=https://github.com/know-me-tools/rsky
+
+EXPOSE 3000
+CMD ["node", "server.js"]
