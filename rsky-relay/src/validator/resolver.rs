@@ -49,9 +49,8 @@ pub enum ResolverError {
 
 pub struct Resolver {
     cache: LruCache<String, (DidEndpoint, DidKey)>,
-    conn: Connection,
-    last: Instant,
-    after: Option<String>,
+    /// Only present when DO_PLC_EXPORT is true.
+    plc_db: Option<(Connection, Instant, Option<String>)>,
     client: Client,
     inflight: HashSet<String>,
     futures: FuturesUnordered<RequestFuture>,
@@ -61,27 +60,26 @@ impl Resolver {
     pub fn new() -> Result<Self, ResolverError> {
         #[expect(clippy::unwrap_used)]
         let cache = LruCache::new(NonZeroUsize::new(CAPACITY_CACHE).unwrap());
-        let flag = if *DO_PLC_EXPORT {
-            OpenFlags::SQLITE_OPEN_READ_WRITE
-        } else {
-            OpenFlags::SQLITE_OPEN_READ_ONLY
-        };
-        let conn =
-            Connection::open_with_flags("plc_directory.db", flag | OpenFlags::SQLITE_OPEN_CREATE)?;
-        conn.busy_timeout(std::time::Duration::from_secs(5))?;
-        conn.execute_batch("PRAGMA journal_mode = WAL; PRAGMA wal_autocheckpoint = 1000;")?;
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS plc_operations (
-                cid TEXT NOT NULL,
-                did TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                nullified INTEGER NOT NULL DEFAULT 0,
-                operation BLOB NOT NULL,
-                PRIMARY KEY (cid)
-            );
-            CREATE INDEX IF NOT EXISTS plc_ops_created_at ON plc_operations (created_at DESC);",
-        )?;
-        if *DO_PLC_EXPORT {
+
+        let plc_db = if *DO_PLC_EXPORT {
+            let conn = Connection::open_with_flags(
+                "plc_directory.db",
+                OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE,
+            )?;
+            conn.busy_timeout(std::time::Duration::from_secs(5))?;
+            conn.execute_batch("PRAGMA journal_mode = WAL; PRAGMA wal_autocheckpoint = 1000;")?;
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS plc_operations (
+                    cid       TEXT    NOT NULL,
+                    did       TEXT    NOT NULL,
+                    created_at TEXT   NOT NULL,
+                    nullified INTEGER NOT NULL DEFAULT 0,
+                    operation BLOB    NOT NULL,
+                    PRIMARY KEY (cid)
+                );
+                CREATE INDEX IF NOT EXISTS plc_ops_created_at
+                    ON plc_operations (created_at DESC);",
+            )?;
             match conn.execute("PRAGMA secure_delete = OFF", []) {
                 Ok(_) | Err(rusqlite::Error::ExecuteReturnedResults) => {}
                 Err(err) => Err(err)?,
@@ -89,16 +87,20 @@ impl Resolver {
             conn.execute("PRAGMA synchronous = NORMAL", [])?;
             conn.execute("PRAGMA incremental_vacuum", [])?;
             conn.execute("PRAGMA optimize = 0x10002", [])?;
-        }
-        let now = Instant::now();
-        let last = now.checked_sub(PLC_EXPORT_INTERVAL).unwrap_or(now);
-        let after = conn
-            .query_row(
-                "SELECT created_at FROM plc_operations ORDER BY created_at DESC LIMIT 1",
-                [],
-                |row| row.get("created_at"),
-            )
-            .optional()?;
+            let now = Instant::now();
+            let last = now.checked_sub(PLC_EXPORT_INTERVAL).unwrap_or(now);
+            let after = conn
+                .query_row(
+                    "SELECT created_at FROM plc_operations ORDER BY created_at DESC LIMIT 1",
+                    [],
+                    |row| row.get("created_at"),
+                )
+                .optional()?;
+            Some((conn, last, after))
+        } else {
+            None
+        };
+
         let client = Client::builder()
             .user_agent("rsky-relay")
             .timeout(REQ_TIMEOUT)
@@ -107,16 +109,21 @@ impl Resolver {
             .build()?;
         let inflight = HashSet::new();
         let futures = FuturesUnordered::new();
-        Ok(Self { cache, conn, last, after, client, inflight, futures })
+        Ok(Self { cache, plc_db, client, inflight, futures })
     }
 
     pub fn expire(&mut self, did: &str, time: DateTime<Utc>) {
-        if let Some(after) = &self.after {
-            if DateTime::parse_from_rfc3339(after).map_or(true, |after| after < time) {
-                tracing::trace!("expiring did");
-                self.cache.pop(did);
-                self.request(did);
-            }
+        let stale = self
+            .plc_db
+            .as_ref()
+            .and_then(|(_, _, after)| after.as_deref())
+            .map_or(true, |after| {
+                DateTime::parse_from_rfc3339(after).map_or(true, |after| after < time)
+            });
+        if stale {
+            tracing::trace!("expiring did");
+            self.cache.pop(did);
+            self.request(did);
         }
     }
 
@@ -134,7 +141,10 @@ impl Resolver {
     }
 
     pub fn query_db(&mut self, did: &str) -> Result<bool, ResolverError> {
-        let mut stmt = self.conn.prepare_cached("SELECT * FROM plc_keys WHERE did = ?1")?;
+        let Some((conn, _, _)) = self.plc_db.as_mut() else {
+            return Ok(false);
+        };
+        let mut stmt = conn.prepare_cached("SELECT * FROM plc_keys WHERE did = ?1")?;
         match stmt.query_one([did], |row| {
             let endpoint =
                 if cfg!(feature = "labeler") { "labeler_endpoint" } else { "pds_endpoint" };
@@ -170,6 +180,7 @@ impl Resolver {
     fn request_inner(&mut self, did: &str, force_direct: bool) {
         self.inflight.insert(did.to_owned());
         if let Some(plc) = did.strip_prefix("did:plc:") {
+            // Use export stream when available; fall back to direct lookup otherwise.
             let plc = if *DO_PLC_EXPORT && !force_direct { None } else { Some(plc) };
             self.send_req(None, plc);
         } else if let Some(web) = did.strip_prefix("did:web:") {
@@ -191,9 +202,10 @@ impl Resolver {
         } else if let Some(plc) = plc {
             tracing::trace!("fetching did");
             (self.client.get(format!("{PLC_URL}/did:plc:{plc}")), Query::Did(plc.to_owned()))
-        } else if let Some(after) = self.after.take() {
+        } else if let Some((_, last, after_slot)) = self.plc_db.as_mut() {
+            let Some(after) = after_slot.take() else { return };
             tracing::trace!(%after, "fetching after");
-            self.last = Instant::now();
+            *last = Instant::now();
             (self.client.get(format!("{PLC_URL}/{PLC_EXPORT}={after}")), Query::Export(after))
         } else {
             return;
@@ -225,10 +237,13 @@ impl Resolver {
                         }
                     }
                     Query::Export(after) => {
-                        self.after = Some(after);
+                        let Some((conn, _, after_slot)) = self.plc_db.as_mut() else {
+                            return Ok(Vec::new());
+                        };
+                        *after_slot = Some(after);
                         let mut dids = Vec::new();
                         let mut count = 0;
-                        let tx = self.conn.transaction()?;
+                        let tx = conn.transaction()?;
                         let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO plc_operations (cid, did, created_at, nullified, operation) VALUES (?1, ?2, ?3, ?4, ?5)")?;
                         for line in bytes.reader().lines() {
                             count += 1;
@@ -240,7 +255,7 @@ impl Resolver {
                                     &doc.nullified,
                                     doc.operation.get().as_bytes(),
                                 ))?;
-                                self.after = Some(doc.created_at);
+                                *after_slot = Some(doc.created_at.clone());
                                 if self.inflight.remove(&doc.did) {
                                     dids.push(doc.did);
                                 }
@@ -263,12 +278,16 @@ impl Resolver {
                     tracing::debug!(%err, "fetch error");
                     // Restore the after cursor on export failure so exports can be retried
                     if let Query::Export(after) = query {
-                        self.after = Some(after);
+                        if let Some((_, _, after_slot)) = self.plc_db.as_mut() {
+                            *after_slot = Some(after);
+                        }
                     }
                 }
             }
-        } else if *DO_PLC_EXPORT && self.last.elapsed() > PLC_EXPORT_INTERVAL {
-            self.send_req(None, None);
+        } else if let Some((_, last, _)) = self.plc_db.as_ref() {
+            if last.elapsed() > PLC_EXPORT_INTERVAL {
+                self.send_req(None, None);
+            }
         }
         Ok(Vec::new())
     }
