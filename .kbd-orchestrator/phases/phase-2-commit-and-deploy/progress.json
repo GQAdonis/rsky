@@ -16,35 +16,35 @@
       "blockers": []
     },
     "p2-c002": {
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "tasks_total": 5,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Commit 1: relay patch + Dockerfile",
+      "tasks_done": 5,
+      "last_task_completed": "Verify no secret values in git diff (only ${VAR} placeholders)",
+      "next_task_pending": null,
       "started_by": "claude-code",
-      "completed_by": null,
+      "completed_by": "claude-code",
       "blockers": []
     },
     "p2-c003": {
-      "status": "PENDING",
+      "status": "READY",
       "tasks_total": 8,
       "tasks_done": 0,
       "last_task_completed": null,
       "next_task_pending": "Set infrastructure secrets",
       "started_by": null,
       "completed_by": null,
-      "blockers": ["p2-c002"],
+      "blockers": [],
       "type": "human"
     },
     "p2-c004": {
-      "status": "PENDING",
+      "status": "READY",
       "tasks_total": 3,
       "tasks_done": 0,
       "last_task_completed": null,
       "next_task_pending": "kubectl apply ArgoCD Application",
       "started_by": null,
       "completed_by": null,
-      "blockers": ["p2-c002"],
+      "blockers": [],
       "type": "human"
     },
     "p2-c005": {
