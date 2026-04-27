@@ -16,6 +16,8 @@ spec:
       labels:
         app: rsky-relay
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       containers:
         - name: rsky-relay
           image: ghcr.io/know-me-tools/rsky-relay:IMAGE_TAG
