@@ -102,8 +102,7 @@ Set these in the repository settings before the first deploy:
 | `PDS_JWT_KEY_K256_PRIVATE_KEY_HEX` | secp256k1 private key hex for JWT signing |
 | `PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX` | secp256k1 private key hex for PLC rotation |
 | `PDS_REPO_SIGNING_KEY_K256_PRIVATE_KEY_HEX` | secp256k1 private key hex for repo signing |
-| `PDS_MAILGUN_API_KEY` | Mailgun API key for email |
-| `PDS_MAILGUN_DOMAIN` | Mailgun sending domain |
+| `RESEND_API_KEY` | Resend API key for transactional email |
 | `GCS_HMAC_ACCESS_KEY` | GCS HMAC access key (S3-compatible blob storage) |
 | `GCS_HMAC_SECRET_KEY` | GCS HMAC secret key |
 | `GCS_BUCKET_NAME` | GCS bucket name for PDS blobs |
