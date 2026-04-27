@@ -26,6 +26,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: web-client-config
+            - secretRef:
+                name: web-client-secret
           livenessProbe:
             httpGet:
               path: /
