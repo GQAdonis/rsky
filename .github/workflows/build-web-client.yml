@@ -50,8 +50,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=web-client
-          cache-to: type=gha,mode=max,scope=web-client
+          cache-from: type=gha,scope=web-client-v2
+          cache-to: type=gha,mode=max,scope=web-client-v2
           build-args: |
             NEXT_PUBLIC_ATP_SERVICE_URL=https://pds.know-me.tools
             NEXT_PUBLIC_ATP_APPVIEW_URL=https://api.bsky.app
