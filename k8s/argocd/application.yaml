@@ -11,7 +11,7 @@ spec:
     path: k8s
     directory:
       recurse: true
-      exclude: "argocd/**"
+      exclude: "{argocd/**,**/secret.yaml}"
   destination:
     server: https://kubernetes.default.svc
     namespace: atproto
