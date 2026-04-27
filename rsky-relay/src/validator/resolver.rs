@@ -10,7 +10,7 @@ use futures::stream::FuturesUnordered;
 use hashbrown::HashSet;
 use lru::LruCache;
 use reqwest::Client;
-use rusqlite::{Connection, OpenFlags};
+use rusqlite::{Connection, OpenFlags, OptionalExtension};
 use serde::Deserialize;
 use serde_json::value::RawValue;
 use thiserror::Error;
@@ -92,11 +92,13 @@ impl Resolver {
         }
         let now = Instant::now();
         let last = now.checked_sub(PLC_EXPORT_INTERVAL).unwrap_or(now);
-        let after = conn.query_one(
-            "SELECT created_at FROM plc_operations ORDER BY created_at DESC LIMIT 1",
-            [],
-            |row| Ok(Some(row.get("created_at")?)),
-        )?;
+        let after = conn
+            .query_row(
+                "SELECT created_at FROM plc_operations ORDER BY created_at DESC LIMIT 1",
+                [],
+                |row| row.get("created_at"),
+            )
+            .optional()?;
         let client = Client::builder()
             .user_agent("rsky-relay")
             .timeout(REQ_TIMEOUT)
