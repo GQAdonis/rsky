@@ -1,9 +1,22 @@
-name: Build & Deploy
+name: Deploy to GKE
 
 on:
-  push:
+  workflow_run:
+    workflows:
+      - "Build web-client"
+      - "Build rsky-pds"
+      - "Build rsky-relay"
+      - "Build rsky-feedgen"
+      - "Build rsky-labeler"
+      - "Build rsky-jetstream-subscriber"
+    types: [completed]
     branches: [main]
   workflow_dispatch:
+    inputs:
+      services:
+        description: 'Comma-separated services to deploy (e.g. web-client,rsky-relay) or "all"'
+        required: false
+        default: 'all'
 
 env:
   REGISTRY: ghcr.io/know-me-tools
@@ -11,77 +24,41 @@ env:
   GKE_REGION: us-central1
 
 jobs:
-  build-and-push:
-    name: Build ${{ matrix.service }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - service: rsky-pds
-            dockerfile: rsky-pds/Dockerfile
-          - service: rsky-feedgen
-            dockerfile: rsky-feedgen/Dockerfile
-          - service: rsky-labeler
-            dockerfile: rsky-labeler/Dockerfile
-          - service: rsky-jetstream-subscriber
-            dockerfile: rsky-jetstream-subscriber/Dockerfile
-          - service: rsky-relay
-            dockerfile: rsky-relay/Dockerfile
-          - service: web-client
-            dockerfile: Dockerfile.web-client
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_PAT }}
-
-      - name: Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ matrix.service }}
-          tags: |
-            type=sha,prefix=,format=short
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
-          build-args: |
-            NEXT_PUBLIC_ATP_SERVICE_URL=https://pds.know-me.tools
-            NEXT_PUBLIC_ATP_APPVIEW_URL=https://api.bsky.app
-
   deploy:
     name: Deploy to GKE
     runs-on: ubuntu-latest
-    needs: build-and-push
+    # On workflow_run: only deploy if the triggering build succeeded
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: read
       id-token: write
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - name: Determine which service to deploy
+        id: service
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "services=${{ github.event.inputs.services }}" >> $GITHUB_OUTPUT
+          else
+            WORKFLOW="${{ github.event.workflow_run.name }}"
+            case "$WORKFLOW" in
+              "Build web-client")                  SVC="web-client" ;;
+              "Build rsky-pds")                    SVC="rsky-pds" ;;
+              "Build rsky-relay")                  SVC="rsky-relay" ;;
+              "Build rsky-feedgen")                SVC="rsky-feedgen" ;;
+              "Build rsky-labeler")                SVC="rsky-labeler" ;;
+              "Build rsky-jetstream-subscriber")   SVC="rsky-jetstream-subscriber" ;;
+              *)                                   SVC="all" ;;
+            esac
+            echo "services=$SVC" >> $GITHUB_OUTPUT
+          fi
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "sha=$(echo '${{ github.event.workflow_run.head_sha }}' | cut -c1-7)" >> $GITHUB_OUTPUT
+          else
+            echo "sha=$(echo '${{ github.sha }}' | cut -c1-7)" >> $GITHUB_OUTPUT
+          fi
 
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
@@ -110,91 +87,106 @@ jobs:
       - name: Apply StorageClass
         run: kubectl apply -f k8s/postgresql/storageclass.yaml
 
-      - name: Inject PostgreSQL secret
+      - name: Apply all k8s manifests (non-secret)
+        run: |
+          SHA=${{ steps.service.outputs.sha }}
+          find k8s -name "*.yaml" \
+            ! -name "secret.yaml" \
+            ! -path "k8s/argocd/*" \
+            ! -path "k8s/postgresql/storageclass.yaml" \
+            | sort | xargs -I{} sh -c \
+              'sed "s|:IMAGE_TAG|:'"$SHA"'|g" "{}" | kubectl apply -f -'
+
+      - name: Inject secrets
         env:
           POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: rsky
-        run: envsubst < k8s/postgresql/secret.yaml | kubectl apply -f -
-
-      - name: Inject rsky-pds secret
-        env:
           PDS_ADMIN_PASS: ${{ secrets.PDS_ADMIN_PASS }}
           PDS_JWT_KEY_K256_PRIVATE_KEY_HEX: ${{ secrets.PDS_JWT_KEY_K256_PRIVATE_KEY_HEX }}
           PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX: ${{ secrets.PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX }}
           PDS_REPO_SIGNING_KEY_K256_PRIVATE_KEY_HEX: ${{ secrets.PDS_REPO_SIGNING_KEY_K256_PRIVATE_KEY_HEX }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           GCS_HMAC_ACCESS_KEY: ${{ secrets.GCS_HMAC_ACCESS_KEY }}
           GCS_HMAC_SECRET_KEY: ${{ secrets.GCS_HMAC_SECRET_KEY }}
           GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
-        run: envsubst < k8s/rsky-pds/secret.yaml | kubectl apply -f -
-
-      - name: Inject rsky-relay secret
-        env:
           RELAY_ADMIN_PASSWORD: ${{ secrets.RELAY_ADMIN_PASSWORD }}
-        run: envsubst < k8s/rsky-relay/secret.yaml | kubectl apply -f -
-
-      - name: Inject rsky-feedgen secret
-        env:
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           RSKY_API_KEY: ${{ secrets.RSKY_API_KEY }}
-        run: envsubst < k8s/rsky-feedgen/secret.yaml | kubectl apply -f -
-
-      - name: Inject rsky-labeler secret
-        env:
           MOD_SERVICE_DID: ${{ secrets.MOD_SERVICE_DID }}
           MOD_SERVICE_EMAIL: ${{ secrets.MOD_SERVICE_EMAIL }}
           MOD_SERVICE_PASSWORD: ${{ secrets.MOD_SERVICE_PASSWORD }}
-        run: envsubst < k8s/rsky-labeler/secret.yaml | kubectl apply -f -
-
-      - name: Inject rsky-jetstream-subscriber secret
-        env:
-          RSKY_API_KEY: ${{ secrets.RSKY_API_KEY }}
-        run: envsubst < k8s/rsky-jetstream-subscriber/secret.yaml | kubectl apply -f -
-
-      - name: Inject web-client secret
-        env:
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-        run: envsubst < k8s/web-client/secret.yaml | kubectl apply -f -
-
-      - name: Apply all k8s manifests
         run: |
-          SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          # Substitute image tags in manifests and apply
-          find k8s -name "*.yaml" \
-            ! -name "secret.yaml" \
-            ! -path "k8s/argocd/*" \
-            ! -path "k8s/postgresql/storageclass.yaml" \
-            | sort | xargs -I{} sh -c '
-              sed "s|:IMAGE_TAG|:'"$SHA"'|g" "{}" | kubectl apply -f -
-            '
+          envsubst < k8s/postgresql/secret.yaml | kubectl apply -f -
+          envsubst < k8s/rsky-pds/secret.yaml | kubectl apply -f -
+          envsubst < k8s/rsky-relay/secret.yaml | kubectl apply -f -
+          envsubst < k8s/rsky-feedgen/secret.yaml | kubectl apply -f -
+          envsubst < k8s/rsky-labeler/secret.yaml | kubectl apply -f -
+          envsubst < k8s/rsky-jetstream-subscriber/secret.yaml | kubectl apply -f -
+          envsubst < k8s/web-client/secret.yaml | kubectl apply -f -
 
-      - name: Update image tags directly on workloads
+      - name: Update image tag(s) on workloads
         run: |
-          SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          SHA=${{ steps.service.outputs.sha }}
+          SVCS=${{ steps.service.outputs.services }}
           REG="${{ env.REGISTRY }}"
-          kubectl set image statefulset/rsky-pds    rsky-pds=$REG/rsky-pds:$SHA                         -n atproto
-          kubectl set image statefulset/rsky-relay  rsky-relay=$REG/rsky-relay:$SHA                     -n atproto
-          kubectl set image deployment/rsky-feedgen rsky-feedgen=$REG/rsky-feedgen:$SHA                  -n atproto
-          kubectl set image deployment/rsky-labeler rsky-labeler=$REG/rsky-labeler:$SHA                  -n atproto
-          kubectl set image deployment/rsky-jetstream-subscriber \
-            rsky-jetstream-subscriber=$REG/rsky-jetstream-subscriber:$SHA -n atproto
-          kubectl set image deployment/web-client   web-client=$REG/web-client:$SHA                      -n atproto
 
-      - name: Wait for rollouts
+          deploy_service() {
+            case "$1" in
+              rsky-pds)
+                kubectl set image statefulset/rsky-pds rsky-pds=$REG/rsky-pds:$SHA -n atproto ;;
+              rsky-relay)
+                kubectl set image statefulset/rsky-relay rsky-relay=$REG/rsky-relay:$SHA -n atproto ;;
+              rsky-feedgen)
+                kubectl set image deployment/rsky-feedgen rsky-feedgen=$REG/rsky-feedgen:$SHA -n atproto ;;
+              rsky-labeler)
+                kubectl set image deployment/rsky-labeler rsky-labeler=$REG/rsky-labeler:$SHA -n atproto ;;
+              rsky-jetstream-subscriber)
+                kubectl set image deployment/rsky-jetstream-subscriber \
+                  rsky-jetstream-subscriber=$REG/rsky-jetstream-subscriber:$SHA -n atproto ;;
+              web-client)
+                kubectl set image deployment/web-client web-client=$REG/web-client:$SHA -n atproto ;;
+            esac
+          }
+
+          if [ "$SVCS" = "all" ]; then
+            for svc in rsky-pds rsky-relay rsky-feedgen rsky-labeler rsky-jetstream-subscriber web-client; do
+              deploy_service "$svc"
+            done
+          else
+            IFS=',' read -ra LIST <<< "$SVCS"
+            for svc in "${LIST[@]}"; do
+              deploy_service "$(echo $svc | xargs)"
+            done
+          fi
+
+      - name: Wait for rollout(s)
         run: |
-          kubectl rollout status statefulset/rsky-pds    -n atproto --timeout=180s
-          kubectl rollout status statefulset/rsky-relay  -n atproto --timeout=180s
-          kubectl rollout status deployment/rsky-feedgen -n atproto --timeout=120s
-          kubectl rollout status deployment/rsky-labeler -n atproto --timeout=120s
-          kubectl rollout status deployment/rsky-jetstream-subscriber -n atproto --timeout=120s
-          kubectl rollout status deployment/web-client   -n atproto --timeout=120s
+          SVCS=${{ steps.service.outputs.services }}
+
+          rollout_service() {
+            case "$1" in
+              rsky-pds)      kubectl rollout status statefulset/rsky-pds -n atproto --timeout=180s ;;
+              rsky-relay)    kubectl rollout status statefulset/rsky-relay -n atproto --timeout=180s ;;
+              rsky-feedgen)  kubectl rollout status deployment/rsky-feedgen -n atproto --timeout=120s ;;
+              rsky-labeler)  kubectl rollout status deployment/rsky-labeler -n atproto --timeout=120s ;;
+              rsky-jetstream-subscriber)
+                kubectl rollout status deployment/rsky-jetstream-subscriber -n atproto --timeout=120s ;;
+              web-client)    kubectl rollout status deployment/web-client -n atproto --timeout=120s ;;
+            esac
+          }
+
+          if [ "$SVCS" = "all" ]; then
+            for svc in rsky-pds rsky-relay rsky-feedgen rsky-labeler rsky-jetstream-subscriber web-client; do
+              rollout_service "$svc"
+            done
+          else
+            IFS=',' read -ra LIST <<< "$SVCS"
+            for svc in "${LIST[@]}"; do
+              rollout_service "$(echo $svc | xargs)"
+            done
+          fi
 
       - name: Deployment summary
         run: |
-          SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          echo "=== Deployed $SHA ==="
+          echo "=== Deployed ${{ steps.service.outputs.services }} @ ${{ steps.service.outputs.sha }} ==="
           kubectl get pods -n atproto
