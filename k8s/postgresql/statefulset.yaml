@@ -19,6 +19,9 @@ spec:
       containers:
         - name: postgresql
           image: pgvector/pgvector:pg17
+          args:
+            - "-c"
+            - "max_connections=200"
           ports:
             - name: postgres
               containerPort: 5432
