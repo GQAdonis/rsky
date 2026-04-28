@@ -203,6 +203,8 @@ pub async fn build_rocket(cfg: Option<RocketConfig>) -> Rocket<Build> {
         env::var("DATABASE_URL").unwrap_or("".into())
     };
 
+    crate::db::run_migrations(&db_url);
+
     let db: Map<_, Value> = map! {
         "url" => db_url.into(),
         "pool_size" => 20.into(),
