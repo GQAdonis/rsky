@@ -47,9 +47,12 @@
   "did_subsystem_phase2": "DONE",
   "did_subsystem_phase3": "DONE",
   "did_subsystem_phase4": "DONE",
-  "did_subsystem_notes": "All 4 phases complete (2026-04-28). Phase 1: async trait + CompositeDidResolver + ATProto profile validator (2f5a39a). Phase 2: did:key + did:peer offline resolvers + with_all_methods builder (ff604f3). Phase 3: AgentAuth Rocket guard + verify_agent_service_jwt in rsky-pds (6cbed43). Phase 4: didMethodsSupported in describeServer + OAuth server metadata (c1555a7). All workspace crates compile clean.",
+  "did_subsystem_notes": "All 4 phases complete (2026-04-28). Phase 1: async trait + CompositeDidResolver + ATProto profile validator (2f5a39a). Phase 2: did:key + did:peer offline resolvers + with_all_methods builder (ff604f3). Phase 3: AgentAuth Rocket guard + verify_agent_service_jwt in rsky-pds (6cbed43). Phase 4: didMethodsSupported in describeServer + OAuth server metadata (c1555a7). Integration (f1be504): SharedCompositeResolver managed state — zero per-request resolver allocation. All workspace crates compile clean.",
   "did_subsystem_phases_remaining": [],
+  "did_subsystem_integration": "DONE",
+  "did_subsystem_integration_commit": "f1be504",
+  "did_subsystem_integration_notes": "SharedCompositeResolver { resolver: CompositeDidResolver } added to rsky-pds managed state (lib.rs build_rocket). verify_agent_service_jwt accepts &CompositeDidResolver instead of plc_url string; AgentAuth::from_request extracts &State<SharedCompositeResolver>. Eliminates per-request with_all_methods() allocation.",
   "next_skill": "kbd-assess",
   "next_command": "/kbd-assess phase-3-pds-feature-parity",
-  "notes": "All 12 parity changes executed (11 implemented, 1 delegated) + DID subsystem Phase 1 complete. cargo check clean across workspace. Phase ready for live verification."
+  "notes": "All 12 parity changes executed (11 implemented, 1 delegated) + DID subsystem all phases + integration complete. cargo check clean across workspace. Phase ready for live verification."
 }
