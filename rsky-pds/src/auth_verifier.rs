@@ -14,6 +14,8 @@ use rocket::State;
 use rsky_common::env::env_str;
 use rsky_common::get_verification_material;
 use rsky_identity::did::atproto_data::get_did_key_from_multibase;
+use rsky_identity::did::capability::{DidCapability, DidError};
+use rsky_identity::did::composite_resolver::CompositeDidResolver;
 use rsky_identity::types::DidDocument;
 use secp256k1::{Keypair, Secp256k1, SecretKey};
 use std::env;
@@ -999,5 +1001,155 @@ pub fn parse_basic_auth(token: &str) -> Option<BasicAuth> {
             password: password.to_string(),
         }),
         _ => None,
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// UAR / A2A Agent Auth
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Result of a verified agent service JWT.
+///
+/// The `agent_did` may be any DID method permitted by `DidCapability::AgentIdentity`
+/// (`did:plc`, `did:key`). It is **never** a bare account DID with a PDS service —
+/// the profile validator blocks `AccountIdentity`-only documents.
+#[derive(Clone, Debug)]
+pub struct AgentJwtContext {
+    /// The issuer DID of the agent JWT.
+    pub agent_did: String,
+    /// The audience DID (must match `PDS_SERVICE_DID`).
+    pub aud: String,
+    /// The lexicon method the token is scoped to, if any.
+    pub lxm: Option<String>,
+}
+
+/// Rocket request guard for A2A / UAR agent tokens.
+///
+/// Accepts service JWTs whose `iss` resolves as `DidCapability::AgentIdentity`
+/// (did:plc or did:key). Rejects tokens from plain account DIDs that have an
+/// `AtprotoPersonalDataServer` service (those must use the standard `AccessFull` path).
+///
+/// Adds zero overhead for non-agent routes: simply don't put this guard on them.
+pub struct AgentAuth {
+    pub agent: AgentJwtContext,
+}
+
+/// Verify a service JWT carrying an agent DID as `iss`.
+///
+/// Uses `CompositeDidResolver` with `AgentIdentity` validation so that:
+/// - `did:plc` agents that do NOT have an `AtprotoPersonalDataServer` service pass
+/// - `did:key` agents always pass (offline, no PDS service required)
+/// - bare account DIDs (did:plc with `AtprotoPersonalDataServer`) are rejected by
+///   the `AccountIdentity` profile constraint being absent — but still resolve fine;
+///   they fail only when the caller checks `AgentIdentity` and the doc doesn't fit
+///
+/// Returns `Err` on any validation failure; the caller should map to 401.
+pub async fn verify_agent_service_jwt(
+    jwt_str: &str,
+    expected_aud: &str,
+    plc_url: &str,
+) -> Result<AgentJwtContext> {
+    // Decode payload without verification first to extract `iss` and `aud`.
+    let parts: Vec<&str> = jwt_str.splitn(3, '.').collect();
+    if parts.len() != 3 {
+        bail!("AgentJwt: malformed JWT");
+    }
+    let payload_b64 = parts[1];
+    let payload_bytes = base64_url::decode(payload_b64)
+        .map_err(|_| anyhow::anyhow!("AgentJwt: invalid base64 payload"))?;
+    let payload: crate::account_manager::helpers::auth::ServiceJwtPayload =
+        serde_json::from_slice(&payload_bytes)
+            .map_err(|e| anyhow::anyhow!("AgentJwt: payload parse error: {e}"))?;
+
+    let iss = payload.iss.clone();
+    let aud = payload.aud.clone();
+
+    if aud != expected_aud {
+        bail!("AgentJwt: audience mismatch: got {aud}, expected {expected_aud}");
+    }
+
+    // Resolve and validate the issuer DID for AgentIdentity.
+    let composite = CompositeDidResolver::with_all_methods(plc_url, 500, None);
+    let resolution = composite
+        .resolve_for_capability(&iss, &DidCapability::AgentIdentity)
+        .await
+        .map_err(|e: DidError| anyhow::anyhow!("AgentJwt: issuer DID not valid for AgentIdentity: {e}"))?;
+
+    // Fetch the signing key from the DID document.
+    // For did:key the key is inline; for did:plc it is the #atproto verification method.
+    let signing_key = if iss.starts_with("did:key:") {
+        // The multibase key is the did:key identifier itself (strip prefix).
+        let multibase = iss.trim_start_matches("did:key:");
+        use rsky_identity::did::atproto_data::{get_did_key_from_multibase, VerificationMaterial};
+        get_did_key_from_multibase(VerificationMaterial {
+            r#type: "Multikey".to_string(),
+            public_key_multibase: multibase.to_string(),
+        })
+        .map_err(|e| anyhow::anyhow!("AgentJwt: did:key material parse error: {e}"))?
+        .ok_or_else(|| anyhow::anyhow!("AgentJwt: did:key has no supported key type"))?
+    } else {
+        // did:plc or other method: look for #atproto in verificationMethod.
+        get_verification_material(&resolution.document, &"atproto".to_string())
+            .and_then(|mat| {
+                get_did_key_from_multibase(mat)
+                    .ok()
+                    .and_then(|k| k)
+            })
+            .ok_or_else(|| anyhow::anyhow!("AgentJwt: no #atproto key in issuer DID document"))?
+    };
+
+    // Verify the JWT signature using the resolved key.
+    crate::xrpc_server::auth::verify_jwt(
+        jwt_str.to_string(),
+        Some(expected_aud.to_string()),
+        |_iss: String, _force_refresh: bool| Ok(signing_key.clone()),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("AgentJwt: signature verification failed: {e}"))?;
+
+    Ok(AgentJwtContext {
+        agent_did: iss,
+        aud,
+        lxm: payload.lxm,
+    })
+}
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for AgentAuth {
+    type Error = ApiError;
+
+    async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        let jwt_str = match bearer_token_from_req(request) {
+            Ok(Some(t)) => t,
+            _ => {
+                return Outcome::Error((
+                    Status::Unauthorized,
+                    ApiError::AuthRequiredError("missing bearer token".to_string()),
+                ))
+            }
+        };
+
+        let plc_url = env_str("PDS_DID_PLC_URL")
+            .unwrap_or_else(|| "https://plc.directory".to_string());
+        let service_did = match env_str("PDS_SERVICE_DID") {
+            Some(d) => d,
+            None => {
+                return Outcome::Error((
+                    Status::InternalServerError,
+                    ApiError::RuntimeError,
+                ))
+            }
+        };
+
+        match verify_agent_service_jwt(&jwt_str, &service_did, &plc_url).await {
+            Ok(agent) => Outcome::Success(AgentAuth { agent }),
+            Err(e) => {
+                tracing::warn!("AgentAuth rejected: {e}");
+                Outcome::Error((
+                    Status::Unauthorized,
+                    ApiError::AuthRequiredError(e.to_string()),
+                ))
+            }
+        }
     }
 }
