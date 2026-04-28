@@ -44,8 +44,11 @@
   "deployment_notes": "ArgoCD removed. Unified deploy.yml (conduit pattern) replaces ArgoCD + 6 standalone build workflows.",
   "next_pending_change": null,
   "did_subsystem_phase1": "DONE",
-  "did_subsystem_notes": "Phase 1 complete (2026-04-28): async DidResolver trait, DidCapability tiers, CompositeDidResolver, ATProto DID Profile validator, did:plc + did:web trait impls, extended DidDocument (DID Core verification relationships), Service.service_endpoint promoted to serde_json::Value. All workspace crates compile clean. Commit: 2f5a39a.",
-  "did_subsystem_phases_remaining": ["Phase 2 — did:key + did:peer resolvers", "Phase 3 — UAR/A2A agent DID routing", "Phase 4 — federation metadata advertisement"],
+  "did_subsystem_phase2": "DONE",
+  "did_subsystem_phase3": "DONE",
+  "did_subsystem_phase4": "DONE",
+  "did_subsystem_notes": "All 4 phases complete (2026-04-28). Phase 1: async trait + CompositeDidResolver + ATProto profile validator (2f5a39a). Phase 2: did:key + did:peer offline resolvers + with_all_methods builder (ff604f3). Phase 3: AgentAuth Rocket guard + verify_agent_service_jwt in rsky-pds (6cbed43). Phase 4: didMethodsSupported in describeServer + OAuth server metadata (c1555a7). All workspace crates compile clean.",
+  "did_subsystem_phases_remaining": [],
   "next_skill": "kbd-assess",
   "next_command": "/kbd-assess phase-3-pds-feature-parity",
   "notes": "All 12 parity changes executed (11 implemented, 1 delegated) + DID subsystem Phase 1 complete. cargo check clean across workspace. Phase ready for live verification."
