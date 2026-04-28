@@ -22,10 +22,15 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' ||
       contains(toJson(github.event.commits), '"rsky-pds/') ||
+      contains(toJson(github.event.head_commit), '"rsky-pds/') ||
       contains(toJson(github.event.commits), '"rsky-common/') ||
+      contains(toJson(github.event.head_commit), '"rsky-common/') ||
       contains(toJson(github.event.commits), '"rsky-lexicon/') ||
+      contains(toJson(github.event.head_commit), '"rsky-lexicon/') ||
       contains(toJson(github.event.commits), '"rsky-repo/') ||
-      contains(toJson(github.event.commits), '"Cargo.lock"')
+      contains(toJson(github.event.head_commit), '"rsky-repo/') ||
+      contains(toJson(github.event.commits), '"Cargo.lock"') ||
+      contains(toJson(github.event.head_commit), '"Cargo.lock"')
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
     steps:
@@ -61,9 +66,13 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' ||
       contains(toJson(github.event.commits), '"rsky-relay/') ||
+      contains(toJson(github.event.head_commit), '"rsky-relay/') ||
       contains(toJson(github.event.commits), '"rsky-common/') ||
+      contains(toJson(github.event.head_commit), '"rsky-common/') ||
       contains(toJson(github.event.commits), '"rsky-firehose/') ||
-      contains(toJson(github.event.commits), '"Cargo.lock"')
+      contains(toJson(github.event.head_commit), '"rsky-firehose/') ||
+      contains(toJson(github.event.commits), '"Cargo.lock"') ||
+      contains(toJson(github.event.head_commit), '"Cargo.lock"')
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
     steps:
@@ -99,7 +108,9 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' ||
       contains(toJson(github.event.commits), '"rsky-feedgen/') ||
-      contains(toJson(github.event.commits), '"Cargo.lock"')
+      contains(toJson(github.event.head_commit), '"rsky-feedgen/') ||
+      contains(toJson(github.event.commits), '"Cargo.lock"') ||
+      contains(toJson(github.event.head_commit), '"Cargo.lock"')
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
     steps:
@@ -135,7 +146,9 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' ||
       contains(toJson(github.event.commits), '"rsky-labeler/') ||
-      contains(toJson(github.event.commits), '"Cargo.lock"')
+      contains(toJson(github.event.head_commit), '"rsky-labeler/') ||
+      contains(toJson(github.event.commits), '"Cargo.lock"') ||
+      contains(toJson(github.event.head_commit), '"Cargo.lock"')
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
     steps:
@@ -171,7 +184,9 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' ||
       contains(toJson(github.event.commits), '"rsky-jetstream-subscriber/') ||
-      contains(toJson(github.event.commits), '"Cargo.lock"')
+      contains(toJson(github.event.head_commit), '"rsky-jetstream-subscriber/') ||
+      contains(toJson(github.event.commits), '"Cargo.lock"') ||
+      contains(toJson(github.event.head_commit), '"Cargo.lock"')
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
     steps:
@@ -207,7 +222,9 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' ||
       contains(toJson(github.event.commits), '"web-client/') ||
-      contains(toJson(github.event.commits), '"Dockerfile.web-client"')
+      contains(toJson(github.event.head_commit), '"web-client/') ||
+      contains(toJson(github.event.commits), '"Dockerfile.web-client"') ||
+      contains(toJson(github.event.head_commit), '"Dockerfile.web-client"')
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
     steps:
