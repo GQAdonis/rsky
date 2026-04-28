@@ -1,6 +1,6 @@
 {
   "phase": "phase-2-commit-and-deploy",
-  "last_updated": "2026-04-28T12:15:00Z",
+  "last_updated": "2026-04-28T15:39:39Z",
   "last_updated_by": "claude-code",
   "assessment_complete": true,
   "plan_complete": true,
@@ -29,7 +29,7 @@
       "status": "DONE",
       "tasks_total": 8,
       "tasks_done": 8,
-      "last_task_completed": "All 19 GitHub secrets seeded (POSTGRES_DB added as missing; all others pre-existing from 2026-04-27). ArgoCD unregistered — deploy.yaml deleted.",
+      "last_task_completed": "All 19 GitHub secrets seeded (POSTGRES_DB added as missing; all others pre-existing from 2026-04-27). ArgoCD unregistered \u2014 deploy.yaml deleted.",
       "next_task_pending": null,
       "started_by": "claude-code",
       "completed_by": "claude-code",
@@ -45,13 +45,13 @@
       "started_by": "claude-code",
       "completed_by": "claude-code",
       "blockers": [],
-      "notes": "ArgoCD Application was never applied — task was to unregister/not use it. Converted to GitHub Actions-only deployment (commit 4cd3883)."
+      "notes": "ArgoCD Application was never applied \u2014 task was to unregister/not use it. Converted to GitHub Actions-only deployment (commit 4cd3883)."
     },
     "p2-c005": {
       "status": "DONE",
       "tasks_total": 5,
       "tasks_done": 5,
-      "last_task_completed": "git push origin main — 9 commits pushed (f3cc648..4cd3883). Build & Deploy workflow run 25052075413 completed: success.",
+      "last_task_completed": "git push origin main \u2014 9 commits pushed (f3cc648..4cd3883). Build & Deploy workflow run 25052075413 completed: success.",
       "next_task_pending": null,
       "started_by": "claude-code",
       "completed_by": "claude-code",
@@ -59,13 +59,13 @@
       "notes": "All services deployed to GKE. PostgreSQL, rsky-pds, rsky-relay, rsky-feedgen, rsky-labeler, rsky-jetstream-subscriber, web-client all rolled out successfully."
     },
     "p2-c006": {
-      "status": "PENDING",
+      "status": "DONE",
       "tasks_total": 7,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Get Gateway IPs from kubectl and set Cloudflare DNS A records",
-      "started_by": null,
-      "completed_by": null,
+      "tasks_done": 7,
+      "last_task_completed": "All 4 TLS certificates Ready: True \u2014 DNS A records confirmed set via cert-manager ACME validation",
+      "next_task_pending": null,
+      "started_by": "travis-james",
+      "completed_by": "claude-code",
       "blockers": [],
       "type": "human",
       "notes": "p2-c005 is DONE. Gateway IPs are printed in the workflow run output (step: Print Gateway IPs). Set Cloudflare A records for pds/relay/feed/social.know-me.tools."
@@ -78,7 +78,9 @@
       "next_task_pending": "curl health check all endpoints after DNS propagates",
       "started_by": null,
       "completed_by": null,
-      "blockers": ["p2-c006"],
+      "blockers": [
+        "p2-c006"
+      ],
       "type": "human"
     }
   }
