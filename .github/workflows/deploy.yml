@@ -3,6 +3,24 @@ name: Build & Deploy
 on:
   push:
     branches: [main]
+    paths:
+      - 'rsky-pds/**'
+      - 'rsky-relay/**'
+      - 'rsky-feedgen/**'
+      - 'rsky-labeler/**'
+      - 'rsky-jetstream-subscriber/**'
+      - 'rsky-common/**'
+      - 'rsky-lexicon/**'
+      - 'rsky-repo/**'
+      - 'rsky-firehose/**'
+      - 'rsky-identity/**'
+      - 'rsky-crypto/**'
+      - 'rsky-syntax/**'
+      - 'web-client/**'
+      - 'Dockerfile.web-client'
+      - 'Cargo.lock'
+      - 'k8s/**'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 permissions:
