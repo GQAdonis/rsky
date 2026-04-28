@@ -3,7 +3,7 @@ use crate::account_manager::helpers::auth::CustomClaimObj;
 use crate::account_manager::AccountManager;
 use crate::apis::ApiError;
 use crate::xrpc_server::auth::{verify_jwt as verify_service_jwt_server, ServiceJwtPayload};
-use crate::SharedIdResolver;
+use crate::{SharedCompositeResolver, SharedIdResolver};
 use anyhow::{bail, Result};
 use base64::{engine::general_purpose::STANDARD as base64pad, Engine as _};
 use jwt_simple::claims::Audiences;
@@ -1047,7 +1047,7 @@ pub struct AgentAuth {
 pub async fn verify_agent_service_jwt(
     jwt_str: &str,
     expected_aud: &str,
-    plc_url: &str,
+    composite: &CompositeDidResolver,
 ) -> Result<AgentJwtContext> {
     // Decode payload without verification first to extract `iss` and `aud`.
     let parts: Vec<&str> = jwt_str.splitn(3, '.').collect();
@@ -1067,9 +1067,6 @@ pub async fn verify_agent_service_jwt(
     if aud != expected_aud {
         bail!("AgentJwt: audience mismatch: got {aud}, expected {expected_aud}");
     }
-
-    // Resolve and validate the issuer DID for AgentIdentity.
-    let composite = CompositeDidResolver::with_all_methods(plc_url, 500, None);
     let resolution = composite
         .resolve_for_capability(&iss, &DidCapability::AgentIdentity)
         .await
@@ -1129,8 +1126,6 @@ impl<'r> FromRequest<'r> for AgentAuth {
             }
         };
 
-        let plc_url = env_str("PDS_DID_PLC_URL")
-            .unwrap_or_else(|| "https://plc.directory".to_string());
         let service_did = match env_str("PDS_SERVICE_DID") {
             Some(d) => d,
             None => {
@@ -1141,7 +1136,12 @@ impl<'r> FromRequest<'r> for AgentAuth {
             }
         };
 
-        match verify_agent_service_jwt(&jwt_str, &service_did, &plc_url).await {
+        let composite = request
+            .guard::<&State<SharedCompositeResolver>>()
+            .await
+            .unwrap();
+
+        match verify_agent_service_jwt(&jwt_str, &service_did, &composite.resolver).await {
             Ok(agent) => Outcome::Success(AgentAuth { agent }),
             Err(e) => {
                 tracing::warn!("AgentAuth rejected: {e}");

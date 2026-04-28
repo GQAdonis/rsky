@@ -53,6 +53,10 @@ pub struct SharedIdResolver {
     pub id_resolver: RwLock<IdResolver>,
 }
 
+pub struct SharedCompositeResolver {
+    pub resolver: CompositeDidResolver,
+}
+
 pub struct SharedLocalViewer {
     pub local_viewer: RwLock<LocalViewerCreator>,
 }
@@ -86,6 +90,7 @@ use rocket::serde::json::Json;
 use rocket::shield::{NoSniff, Shield};
 use rocket::{Request, Response};
 use rsky_common::env::env_list;
+use rsky_identity::did::composite_resolver::CompositeDidResolver;
 use rsky_identity::types::{DidCache, IdentityResolverOpts};
 use rsky_identity::IdResolver;
 use std::env;
@@ -231,15 +236,24 @@ pub async fn build_rocket(cfg: Option<RocketConfig>) -> Rocket<Build> {
         .load()
         .await;
 
+    let plc_url =
+        env::var("PDS_DID_PLC_URL").unwrap_or_else(|_| "https://plc.directory".to_owned());
+
     let id_resolver = SharedIdResolver {
         id_resolver: RwLock::new(IdResolver::new(IdentityResolverOpts {
             timeout: None,
-            plc_url: Some(
-                env::var("PDS_DID_PLC_URL").unwrap_or("https://plc.directory".to_owned()),
-            ),
+            plc_url: Some(plc_url.clone()),
             did_cache: Some(DidCache::new(None, None)),
             backup_nameservers: Some(env_list("PDS_HANDLE_BACKUP_NAMESERVERS")),
         })),
+    };
+
+    let composite_resolver = SharedCompositeResolver {
+        resolver: CompositeDidResolver::with_all_methods(
+            &plc_url,
+            500,
+            Some(DidCache::new(None, None)),
+        ),
     };
 
     // Keeping unused for other config purposes for now.
@@ -384,6 +398,7 @@ pub async fn build_rocket(cfg: Option<RocketConfig>) -> Rocket<Build> {
         .manage(sequencer)
         .manage(aws_sdk_config)
         .manage(id_resolver)
+        .manage(composite_resolver)
         .manage(cfg)
         .manage(local_viewer)
         .manage(app_view_agent)
