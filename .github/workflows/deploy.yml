@@ -369,6 +369,19 @@ jobs:
           kubectl rollout status statefulset/postgresql \
             -n atproto --timeout=300s
 
+      # ── pgbouncer ─────────────────────────────────────────────────────────
+      - name: Apply pgbouncer manifests
+        run: |
+          kubectl apply -f k8s/pgbouncer/configmap.yaml
+          kubectl apply -f k8s/pgbouncer/secret.yaml
+          kubectl apply -f k8s/pgbouncer/service.yaml
+          kubectl apply -f k8s/pgbouncer/deployment.yaml
+
+      - name: Wait for pgbouncer ready
+        run: |
+          kubectl rollout status deployment/pgbouncer \
+            -n atproto --timeout=120s
+
       # ── rsky-pds ─────────────────────────────────────────────────────────
       - name: Apply rsky-pds manifests
         run: |
