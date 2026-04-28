@@ -1,5 +1,5 @@
 FROM rust:1.86-slim AS chef
-RUN cargo install cargo-chef --locked
+RUN cargo install cargo-chef
 RUN apt-get update && apt-get install -y \
     pkg-config libssl-dev libpq-dev \
     && rm -rf /var/lib/apt/lists/*
