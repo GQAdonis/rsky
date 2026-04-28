@@ -1,6 +1,8 @@
 # ATProto Stack — Kubernetes Manifests
 
-Deployed to GKE via ArgoCD GitOps. CI builds images, commits SHA tags back to this directory, and ArgoCD auto-syncs.
+Deployed to GKE via GitHub Actions (`deploy.yml`). On push to `main`, images
+are built in parallel, then the deploy job applies manifests and rolls out
+workloads using `kubectl` directly — no ArgoCD.
 
 ## Namespace
 
@@ -23,25 +25,23 @@ Deployed to GKE via ArgoCD GitOps. CI builds images, commits SHA tags back to th
 ```
 k8s/
 ├── namespace.yaml
-├── argocd/
-│   └── application.yaml                 # ArgoCD Application (apply manually once)
 ├── postgresql/
 │   ├── storageclass.yaml                # atproto-ssd-immediate (volumeBindingMode: Immediate)
 │   ├── initdb-configmap.yaml            # Creates rsky + rsky_feedgen databases on first start
-│   ├── secret.yaml                      # envsubst template
+│   ├── secret.yaml                      # envsubst template (filled by CI)
 │   ├── statefulset.yaml
 │   └── service.yaml
 ├── rsky-pds/
 │   ├── configmap.yaml
-│   ├── secret.yaml                      # envsubst template
-│   ├── statefulset.yaml
+│   ├── secret.yaml                      # envsubst template (filled by CI)
+│   ├── statefulset.yaml                 # IMAGE_TAG replaced by CI sed
 │   ├── service.yaml
 │   ├── certificate.yaml
 │   ├── gateway.yaml
 │   ├── httproute-https.yaml
 │   └── httproute-redirect.yaml
 ├── rsky-relay/
-│   ├── secret.yaml                      # envsubst template
+│   ├── secret.yaml                      # envsubst template (filled by CI)
 │   ├── statefulset.yaml                 # WORKDIR /data — PVC mounts here
 │   ├── service.yaml
 │   ├── certificate.yaml
@@ -50,7 +50,7 @@ k8s/
 │   └── httproute-redirect.yaml
 ├── rsky-feedgen/
 │   ├── configmap.yaml
-│   ├── secret.yaml                      # envsubst template
+│   ├── secret.yaml                      # envsubst template (filled by CI)
 │   ├── deployment.yaml
 │   ├── service.yaml
 │   ├── certificate.yaml
@@ -59,11 +59,11 @@ k8s/
 │   └── httproute-redirect.yaml
 ├── rsky-labeler/
 │   ├── configmap.yaml                   # ENABLE_* = false (standby mode)
-│   ├── secret.yaml                      # envsubst template
+│   ├── secret.yaml                      # envsubst template (filled by CI)
 │   └── deployment.yaml
 ├── rsky-jetstream-subscriber/
 │   ├── configmap.yaml
-│   ├── secret.yaml                      # envsubst template
+│   ├── secret.yaml                      # envsubst template (filled by CI)
 │   └── deployment.yaml
 └── web-client/
     ├── configmap.yaml
@@ -77,22 +77,23 @@ k8s/
 
 ## Required GitHub Secrets
 
-Set these in the repository settings before the first deploy:
+All secrets are already seeded. Reference only:
 
 ### Infrastructure
 
 | Secret | Description |
 |--------|-------------|
-| `GKE_SA_KEY` | GCP service account JSON (same as conduit project) |
+| `GKE_SA_KEY` | GCP service account JSON |
 | `GKE_PROJECT_ID` | GCP project ID |
-| `GHCR_PAT` | GitHub PAT with `packages:write` + `contents:write` |
+| `GHCR_PAT` | GitHub PAT with `packages:write` |
 
 ### PostgreSQL
 
 | Secret | Description |
 |--------|-------------|
-| `POSTGRES_USER` | PostgreSQL username (e.g. `rsky`) |
-| `POSTGRES_PASSWORD` | Strong generated password |
+| `POSTGRES_USER` | PostgreSQL username |
+| `POSTGRES_PASSWORD` | PostgreSQL password |
+| `POSTGRES_DB` | Default database name (`rsky`) |
 
 ### rsky-pds
 
@@ -119,38 +120,51 @@ Set these in the repository settings before the first deploy:
 |--------|-------------|
 | `RSKY_API_KEY` | Shared API key authenticating jetstream→feedgen queue writes |
 
-### rsky-labeler (standby — populate with placeholders initially)
+### rsky-labeler (standby — placeholders until activated)
 
 | Secret | Description |
 |--------|-------------|
-| `MOD_SERVICE_DID` | Labeler service account DID (e.g. `did:plc:xxxxx`) |
+| `MOD_SERVICE_DID` | Labeler service account DID |
 | `MOD_SERVICE_EMAIL` | Labeler service account email |
 | `MOD_SERVICE_PASSWORD` | Labeler service account password |
 
-## Generating PDS Keys
+### web-client
+
+| Secret | Description |
+|--------|-------------|
+| `NEXTAUTH_SECRET` | NextAuth.js session secret |
+
+## Deploying
+
+Push to `main` — GitHub Actions (`deploy.yml`) builds changed images and deploys to GKE.
+
+Manual full redeploy (all services):
 
 ```bash
-# Each key is a secp256k1 private key — generate 3 independent ones
-openssl ecparam -name secp256k1 -genkey -noout | \
-  openssl ec -text -noout 2>/dev/null | \
-  grep priv -A 3 | tail -3 | tr -d ' :\n'
+gh workflow run deploy.yml
 ```
 
-## First Deploy
+Targeted single-service redeploy:
 
-1. Apply the ArgoCD Application manually once:
-   ```bash
-   kubectl apply -f k8s/argocd/application.yaml
-   ```
-2. Set all GitHub secrets listed above. For labeler secrets, use placeholder values (e.g. `placeholder`).
-3. Push to `main` — CI builds images and commits SHA tags; ArgoCD syncs.
-4. Set Cloudflare DNS A records (DNS only / grey cloud initially for cert issuance):
-   ```
-   pds.know-me.tools     →  kubectl get gateway pds-gateway -n atproto -o jsonpath='{.status.addresses[0].value}'
-   relay.know-me.tools   →  kubectl get gateway relay-gateway -n atproto -o jsonpath='{.status.addresses[0].value}'
-   feed.know-me.tools    →  kubectl get gateway feedgen-gateway -n atproto -o jsonpath='{.status.addresses[0].value}'
-   social.know-me.tools  →  kubectl get gateway web-client-gateway -n atproto -o jsonpath='{.status.addresses[0].value}'
-   ```
+```bash
+gh workflow run deploy.yml -f services=rsky-pds
+```
+
+## After First Deploy — DNS
+
+Get Gateway IPs and set Cloudflare A records (DNS-only / grey cloud initially for cert issuance):
+
+```bash
+kubectl get gateway -n atproto \
+  -o custom-columns='NAME:.metadata.name,IP:.status.addresses[0].value'
+```
+
+| DNS record | Gateway name |
+|-----------|--------------|
+| `pds.know-me.tools` | `pds-gateway` |
+| `relay.know-me.tools` | `relay-gateway` |
+| `feed.know-me.tools` | `feedgen-gateway` |
+| `social.know-me.tools` | `web-client-gateway` |
 
 ## GCS HMAC Keys
 
@@ -158,25 +172,39 @@ Create via GCP Console → Cloud Storage → Settings → Interoperability → C
 
 The `AWS_*` env var names are intentional — rsky-pds uses an S3-compatible Rust SDK that reads standard AWS env vars. The endpoint is set to `https://storage.googleapis.com`.
 
+## Generating PDS Keys
+
+```bash
+openssl ecparam -name secp256k1 -genkey -noout | \
+  openssl ec -text -noout 2>/dev/null | \
+  grep priv -A 3 | tail -3 | tr -d ' :\n'
+```
+
+Generate three independent keys: JWT signing, PLC rotation, repo signing.
+
 ## Activating the Labeler
 
 rsky-labeler is deployed in standby mode (all actions disabled). To activate:
 
 1. Create a Bluesky account to serve as the labeler service account.
-2. Register a labeler service record (`app.bsky.labeler.service`) on your PDS for that account.
-3. Get the account's DID from: `https://pds.know-me.tools/xrpc/com.atproto.identity.resolveHandle?handle=<your-handle>`
-4. Set the GitHub secrets: `MOD_SERVICE_DID`, `MOD_SERVICE_EMAIL`, `MOD_SERVICE_PASSWORD` with real values.
+2. Register a labeler service record (`app.bsky.labeler.service`) on your PDS.
+3. Get the account's DID:
+   ```
+   https://pds.know-me.tools/xrpc/com.atproto.identity.resolveHandle?handle=<your-handle>
+   ```
+4. Set GitHub secrets: `MOD_SERVICE_DID`, `MOD_SERVICE_EMAIL`, `MOD_SERVICE_PASSWORD`.
 5. Update `k8s/rsky-labeler/configmap.yaml`: set `ENABLE_CREATE_REPORT`, `ENABLE_CREATE_LABEL`, `ENABLE_CREATE_TAG` to `"true"`.
-6. Commit and push — ArgoCD deploys the updated ConfigMap and restarts the pod.
+6. Push to `main` — GitHub Actions deploys the updated ConfigMap and restarts the pod.
 
 ## rsky-relay Storage Notes
 
-The relay StatefulSet uses WORKDIR `/data` in the container, which is also the PVC mount path. All rsky-relay storage files use relative paths from CWD:
+The relay StatefulSet uses WORKDIR `/data` in the container, which is also the PVC mount path:
 - `relay.db` — SQLite for host bans and validator state
 - `plc_directory.db` — SQLite for DID resolution cache
-- `db/` — fjall LSM database for firehose event storage (up to 320 GiB)
+- `db/` — fjall LSM database for firehose event storage
 
-The 100Gi PVC is sized to handle initial operation. Expand via:
+Expand PVC when needed:
+
 ```bash
 kubectl patch pvc rsky-relay-data-rsky-relay-0 -n atproto \
   -p '{"spec":{"resources":{"requests":{"storage":"200Gi"}}}}'
