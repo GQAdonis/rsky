@@ -1,8 +1,12 @@
 use crate::did::capability::{DidCapability, DidError, DidResolution, ResolutionMetadata};
+use crate::did::key_resolver::DidKeyResolver;
+use crate::did::peer_resolver::DidPeerResolver;
+use crate::did::plc_resolver::DidPlcResolver;
 use crate::did::resolver_trait::DidResolver;
+use crate::did::web_resolver::DidWebResolver;
 use crate::types::{DidCache, DidDocument};
 use std::collections::HashMap;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 /// Dispatches DID resolution to the resolver registered for a given DID method.
 ///
@@ -27,6 +31,26 @@ impl CompositeDidResolver {
     /// Register a resolver for the DID method it reports via `DidResolver::method()`.
     pub fn register(&mut self, resolver: Box<dyn DidResolver>) {
         self.resolvers.insert(resolver.method().to_string(), resolver);
+    }
+
+    /// Build a resolver with all four built-in methods pre-registered.
+    ///
+    /// - `did:plc` — AT Protocol native, mutable, requires PLC directory URL
+    /// - `did:web` — organisational / domain-bound identity
+    /// - `did:key` — ephemeral offline key; **not** permitted for AccountIdentity
+    /// - `did:peer` — ephemeral peer channel; **not** permitted for AccountIdentity
+    pub fn with_all_methods(
+        plc_url: impl Into<String>,
+        timeout_ms: u64,
+        cache: Option<DidCache>,
+    ) -> Self {
+        let timeout = Duration::from_millis(timeout_ms);
+        let mut resolver = Self::new(timeout_ms, cache);
+        resolver.register(Box::new(DidPlcResolver::new(plc_url.into(), timeout, None)));
+        resolver.register(Box::new(DidWebResolver::new(timeout, None)));
+        resolver.register(Box::new(DidKeyResolver::new()));
+        resolver.register(Box::new(DidPeerResolver::new()));
+        resolver
     }
 
     fn parse_method(did: &str) -> Result<&str, DidError> {
