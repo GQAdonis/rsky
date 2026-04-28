@@ -20,7 +20,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: rsky-pds
-          image: ghcr.io/know-me-tools/rsky-pds:8d7bb44
+          image: ghcr.io/know-me-tools/rsky-pds:56f9a6b
           ports:
             - name: http
               containerPort: 3000
