@@ -643,10 +643,17 @@ impl<'r> FromRequest<'r> for AdminToken {
     async fn from_request(req: &'r Request<'_>) -> Outcome<Self, Self::Error> {
         let auth_header: &str = req.headers().get_one("Authorization").unwrap_or("");
         match parse_basic_auth(auth_header) {
-            None => Outcome::Error((
-                Status::BadRequest,
-                AuthError::AuthRequired("AuthMissing".to_string()),
-            )),
+            None => {
+                req.local_cache(|| {
+                    Some(ApiError::AuthRequiredError(
+                        "AuthRequired: credentials required".to_string(),
+                    ))
+                });
+                Outcome::Error((
+                    Status::Unauthorized,
+                    AuthError::AuthRequired("AuthMissing".to_string()),
+                ))
+            }
             Some(parsed) => {
                 let BasicAuth { username, password } = parsed;
 
