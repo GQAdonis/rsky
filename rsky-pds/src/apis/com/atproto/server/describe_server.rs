@@ -30,5 +30,11 @@ pub async fn describe_server() -> Result<Json<DescribeServerOutput>, ApiError> {
             email: contact_email_address,
         },
         oauth_issuer,
+        did_methods_supported: Some(vec![
+            "did:plc".to_string(),
+            "did:web".to_string(),
+            "did:key".to_string(),
+            "did:peer".to_string(),
+        ]),
     }))
 }

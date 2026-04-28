@@ -22,6 +22,11 @@ pub struct OAuthServerMetadata {
     pub subject_types_supported: Vec<String>,
     pub revocation_endpoint: String,
     pub introspection_endpoint: String,
+    /// DID methods this PDS accepts for agent/service authentication.
+    ///
+    /// Advertised so federation peers know which DID types to use when
+    /// constructing A2A service JWTs destined for this server.
+    pub did_methods_supported: Vec<String>,
 }
 
 #[rocket::get("/.well-known/oauth-authorization-server")]
@@ -61,5 +66,11 @@ pub fn oauth_server_metadata() -> Json<OAuthServerMetadata> {
         subject_types_supported: vec!["public".to_string()],
         revocation_endpoint: format!("{base}/oauth/revoke"),
         introspection_endpoint: format!("{base}/oauth/introspect"),
+        did_methods_supported: vec![
+            "did:plc".to_string(),
+            "did:web".to_string(),
+            "did:key".to_string(),
+            "did:peer".to_string(),
+        ],
     })
 }
