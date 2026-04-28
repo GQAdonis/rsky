@@ -8070,12 +8070,14 @@ name = "rsky-identity"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "hickory-resolver 0.24.4",
  "reqwest 0.12.23",
  "rsky-crypto",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "tokio",
  "url",
  "urlencoding",
 ]

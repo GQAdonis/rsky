@@ -236,7 +236,7 @@ impl BackfillerManager {
                 for service in services {
                     if service.r#type == "AtprotoPersonalDataServer" || service.id == "#atproto_pds"
                     {
-                        endpoint = Some(service.service_endpoint.clone());
+                        endpoint = service.endpoint_str().map(|s| s.to_string());
                         break;
                     }
                 }

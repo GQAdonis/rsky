@@ -128,7 +128,7 @@ pub async fn assert_valid_did_documents_for_service(did: String) -> Result<()> {
             .iter()
             .flatten()
             .find(|s| s.id == "#atproto_pds" || s.id.ends_with("#atproto_pds"))
-            .map(|s| s.service_endpoint.clone());
+            .and_then(|s| s.endpoint_str().map(|e| e.to_string()));
         let signing_key = doc
             .verification_method
             .iter()

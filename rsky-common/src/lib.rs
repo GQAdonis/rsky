@@ -138,10 +138,14 @@ pub fn get_service_endpoint(doc: DidDocument, opts: GetServiceEndpointOpts) -> O
             match found {
                 None => None,
                 Some(found) => match opts.r#type {
-                    None => validate_url(&found.service_endpoint),
-                    Some(opts_type) if found.r#type == opts_type => {
-                        validate_url(&found.service_endpoint)
-                    }
+                    None => found
+                        .endpoint_str()
+                        .map(|s| s.to_string())
+                        .and_then(|s| validate_url(&s)),
+                    Some(opts_type) if found.r#type == opts_type => found
+                        .endpoint_str()
+                        .map(|s| s.to_string())
+                        .and_then(|s| validate_url(&s)),
                     _ => None,
                 },
             }
@@ -177,6 +181,7 @@ pub mod time;
 mod tests {
     use crate::{get_service_endpoint, validate_url, GetServiceEndpointOpts};
     use rsky_identity::types::{DidDocument, Service};
+    use serde_json;
 
     #[test]
     fn test_validate_url_when_invalid() {
@@ -201,13 +206,17 @@ mod tests {
         service.push(Service {
             id: "#bsky_chat".to_string(),
             r#type: "BskyChatService".to_string(),
-            service_endpoint: "https://api.bsky.chat".to_string(),
+            service_endpoint: serde_json::json!("https://api.bsky.chat"),
         });
         let doc = DidDocument {
             context: None,
             id: "#bsky_chat".to_string(),
             also_known_as: None,
             verification_method: None,
+            authentication: None,
+            assertion_method: None,
+            capability_invocation: None,
+            capability_delegation: None,
             service: Some(service),
         };
         let opts = GetServiceEndpointOpts {

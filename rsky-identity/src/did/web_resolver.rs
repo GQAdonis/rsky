@@ -1,9 +1,12 @@
 use crate::common::decode_uri_component;
+use crate::did::capability::{DidError, DidResolution, ResolutionMetadata};
+use crate::did::resolver_trait::DidResolver;
 use crate::errors::Error;
 use crate::types::DidCache;
 use anyhow::{bail, Result};
+use async_trait::async_trait;
 use serde_json::Value;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use url::Url;
 
 pub const DOC_PATH: &str = "/.well-known/did.json";
@@ -32,8 +35,6 @@ impl DidWebResolver {
         } else if parts.len() == 1 {
             path = parts[0].clone() + DOC_PATH;
         } else {
-            // how we *would* resolve a did:web with path, if atproto supported it
-            // path = parts.join('/') + "/did.json";
             bail!(Error::UnsupportedDidWebPathError(did))
         }
 
@@ -54,9 +55,38 @@ impl DidWebResolver {
         let res = &response;
         match res.error_for_status_ref() {
             Ok(_) => Ok(Some(response.json::<Value>().await?)),
-            // Positively not found, versus due to e.g. network error
             Err(error) if error.status() == Some(reqwest::StatusCode::NOT_FOUND) => Ok(None),
             Err(error) => bail!(error.to_string()),
         }
+    }
+}
+
+#[async_trait]
+impl DidResolver for DidWebResolver {
+    fn method(&self) -> &str {
+        "web"
+    }
+
+    async fn resolve(&self, did: &str) -> Result<DidResolution, DidError> {
+        let start = Instant::now();
+        let raw = self
+            .resolve_no_check(did.to_string())
+            .await
+            .map_err(|e| DidError::NetworkError(e.to_string()))?;
+
+        let val = raw.ok_or_else(|| DidError::NotFound(did.to_string()))?;
+        let document = serde_json::from_value(val)
+            .map_err(|e| DidError::MalformedDocument(e.to_string()))?;
+
+        Ok(DidResolution {
+            did: did.to_string(),
+            document,
+            metadata: ResolutionMetadata {
+                duration_ms: start.elapsed().as_millis() as u64,
+                method: "web".to_string(),
+                cached: false,
+                http_status: None,
+            },
+        })
     }
 }

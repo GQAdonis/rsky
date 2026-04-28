@@ -11,8 +11,10 @@ pub struct VerificationMethod {
     #[serde(rename = "type")]
     pub r#type: String,
     pub controller: String,
-    #[serde(rename = "publicKeyMultibase")]
+    #[serde(rename = "publicKeyMultibase", skip_serializing_if = "Option::is_none")]
     pub public_key_multibase: Option<String>,
+    #[serde(rename = "publicKeyJwk", skip_serializing_if = "Option::is_none")]
+    pub public_key_jwk: Option<serde_json::Value>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -20,8 +22,27 @@ pub struct Service {
     pub id: String,
     #[serde(rename = "type")]
     pub r#type: String,
+    /// Per DID Core, serviceEndpoint is a URI string, a map, or a set.
     #[serde(rename = "serviceEndpoint")]
-    pub service_endpoint: String,
+    pub service_endpoint: serde_json::Value,
+}
+
+impl Service {
+    /// Returns the service endpoint as a string if it is a JSON string value.
+    ///
+    /// ATProto always uses simple URI strings for `serviceEndpoint`; this helper
+    /// lets call sites treat it as `&str` without caring about the full JSON type.
+    pub fn endpoint_str(&self) -> Option<&str> {
+        self.service_endpoint.as_str()
+    }
+}
+
+/// A DID reference can be an embedded VerificationMethod or a string reference (DID URL).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum VerificationMethodRef {
+    Embedded(VerificationMethod),
+    Reference(String),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -29,10 +50,19 @@ pub struct DidDocument {
     #[serde(rename = "@context")]
     pub context: Option<Vec<String>>,
     pub id: String,
-    #[serde(rename = "alsoKnownAs")]
+    #[serde(rename = "alsoKnownAs", skip_serializing_if = "Option::is_none")]
     pub also_known_as: Option<Vec<String>>,
-    #[serde(rename = "verificationMethod")]
+    #[serde(rename = "verificationMethod", skip_serializing_if = "Option::is_none")]
     pub verification_method: Option<Vec<VerificationMethod>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authentication: Option<Vec<VerificationMethodRef>>,
+    #[serde(rename = "assertionMethod", skip_serializing_if = "Option::is_none")]
+    pub assertion_method: Option<Vec<VerificationMethodRef>>,
+    #[serde(rename = "capabilityInvocation", skip_serializing_if = "Option::is_none")]
+    pub capability_invocation: Option<Vec<VerificationMethodRef>>,
+    #[serde(rename = "capabilityDelegation", skip_serializing_if = "Option::is_none")]
+    pub capability_delegation: Option<Vec<VerificationMethodRef>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub service: Option<Vec<Service>>,
 }
 

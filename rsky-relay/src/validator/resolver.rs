@@ -326,7 +326,7 @@ fn parse_did_doc(input: &Bytes) -> Option<(String, (DidEndpoint, DidKey))> {
                 .service
                 .as_ref()
                 .and_then(|services| services.iter().find(|service| service.id.ends_with(endpoint)))
-                .map(|service| service.service_endpoint.as_str());
+                .and_then(|service| service.service_endpoint.as_str());
             let key = doc
                 .verification_method
                 .as_ref()

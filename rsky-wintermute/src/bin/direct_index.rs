@@ -100,7 +100,7 @@ async fn process_did(
     if let Some(services) = &doc.service {
         for service in services {
             if service.r#type == "AtprotoPersonalDataServer" || service.id == "#atproto_pds" {
-                pds_endpoint = Some(service.service_endpoint.clone());
+                pds_endpoint = service.endpoint_str().map(|s| s.to_string());
                 break;
             }
         }
