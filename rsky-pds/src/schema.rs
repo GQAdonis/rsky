@@ -161,6 +161,16 @@ pub mod pds {
         }
     }
 
+    diesel::table! {
+        pds.used_refresh_token (id) {
+            id -> Int8,
+            jti -> Varchar,
+            did -> Varchar,
+            expires_at -> Varchar,
+            created_at -> Varchar,
+        }
+    }
+
     diesel::allow_tables_to_appear_in_same_query!(
         account,
         account_pref,
@@ -178,5 +188,6 @@ pub mod pds {
         repo_block,
         repo_root,
         repo_seq,
+        used_refresh_token,
     );
 }

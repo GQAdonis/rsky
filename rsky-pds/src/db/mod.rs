@@ -21,8 +21,8 @@ pub fn run_migrations(database_url: &str) {
 pub struct DbConn(PgConnection);
 
 impl Debug for DbConn {
-    fn fmt(&self, _f: &mut Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DbConn").finish_non_exhaustive()
     }
 }
 

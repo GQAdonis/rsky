@@ -20,7 +20,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: rsky-relay
-          image: ghcr.io/know-me-tools/rsky-relay:latest
+          image: ghcr.io/know-me-tools/rsky-relay:IMAGE_TAG
           command: ["rsky-relay"]
           args: ["--no-plc-export"]
           ports:

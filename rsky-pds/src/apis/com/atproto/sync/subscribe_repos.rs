@@ -242,12 +242,13 @@ pub async fn subscribe_repos<'a>(
                         },
                         SeqEvt::TypedSyncEvt(sync) => {
                             let TypedSyncEvt { r#type, seq, time, evt } = sync;
-                            let SyncEvt { did, blocks, rev } = evt;
+                            let SyncEvt { did, blocks, rev, commit } = evt;
                             let subscribe_sync_evt = SubscribeReposSync {
                                 seq,
                                 did,
                                 blocks,
                                 rev,
+                                commit,
                                 time: from_str_to_utc(&time).unwrap_or_else(|e| {
                                 tracing::warn!("failed to parse event timestamp {:?}: {}", time, e);
                                 chrono::Utc::now()

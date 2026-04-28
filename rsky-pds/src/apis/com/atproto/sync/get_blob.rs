@@ -17,7 +17,13 @@ use std::str::FromStr;
 
 #[derive(Responder)]
 #[response(status = 200)]
-pub struct BlobResponder(Vec<u8>, Header<'static>, Header<'static>, Header<'static>);
+pub struct BlobResponder(
+    Vec<u8>,
+    Header<'static>,
+    Header<'static>,
+    Header<'static>,
+    Header<'static>,
+);
 
 async fn inner_get_blob(
     did: String,
@@ -65,6 +71,7 @@ pub async fn get_blob(
                     mime_type.unwrap_or("application/octet-stream".to_string()),
                 ),
                 Header::new("content-security-policy", "default-src 'none'; sandbox"),
+                Header::new("content-disposition", "attachment"),
             ))
         }
         Err(error) => {

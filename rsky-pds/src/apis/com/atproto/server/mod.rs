@@ -93,7 +93,7 @@ pub async fn is_valid_did_doc_for_service(did: String) -> Result<bool> {
 }
 
 pub async fn assert_valid_did_documents_for_service(did: String) -> Result<()> {
-    if did.starts_with("did:plc") {
+    if did.starts_with("did:plc:") {
         let plc_url = env_str("PDS_DID_PLC_URL").unwrap_or("https://plc.directory".to_owned());
         let plc_client = plc::Client::new(plc_url);
         let resolved = plc_client.get_document_data(&did).await?;
@@ -111,8 +111,39 @@ pub async fn assert_valid_did_documents_for_service(did: String) -> Result<()> {
             rotation_keys: Some(resolved.rotation_keys),
         })
         .await?;
+    } else if did.starts_with("did:web:") {
+        // did:web documents are resolved via HTTPS; rotation keys are not present
+        // in the DID document for did:web — skip the rotation key check and only
+        // verify that atproto_pds service endpoint and signing key are correct.
+        use rsky_identity::did::web_resolver::DidWebResolver;
+        use std::time::Duration;
+        let resolver = DidWebResolver::new(Duration::from_secs(5), None);
+        let doc_value = resolver
+            .resolve_no_check(did.clone())
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("did:web document not found for {}", did))?;
+        let doc: rsky_identity::types::DidDocument = serde_json::from_value(doc_value)?;
+        let pds_endpoint = doc
+            .service
+            .iter()
+            .flatten()
+            .find(|s| s.id == "#atproto_pds" || s.id.ends_with("#atproto_pds"))
+            .map(|s| s.service_endpoint.clone());
+        let signing_key = doc
+            .verification_method
+            .iter()
+            .flatten()
+            .find(|m| m.id == "#atproto" || m.id.ends_with("#atproto"))
+            .and_then(|m| m.public_key_multibase.clone());
+        // did:web has no rotation keys managed by this server
+        assert_valid_doc_contents(AssertionContents {
+            pds_endpoint,
+            signing_key,
+            rotation_keys: None,
+        })
+        .await?;
     } else {
-        bail!("Not yet supporting did:web")
+        bail!("Unsupported DID method; only did:plc and did:web are supported")
     }
     Ok(())
 }

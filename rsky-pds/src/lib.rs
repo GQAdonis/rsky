@@ -367,7 +367,14 @@ pub async fn build_rocket(cfg: Option<RocketConfig>) -> Rocket<Build> {
                 bsky_api_get_forwarder,
                 bsky_api_post_forwarder,
                 well_known::well_known,
-                all_options
+                all_options,
+                apis::oauth::metadata::oauth_server_metadata,
+                apis::oauth::jwks::oauth_jwks,
+                apis::oauth::par::oauth_par,
+                apis::oauth::authorize::oauth_authorize,
+                apis::oauth::token::oauth_token,
+                apis::oauth::revoke::oauth_revoke,
+                apis::oauth::introspect::oauth_introspect
             ],
         )
         .register("/", catchers![default_catcher])

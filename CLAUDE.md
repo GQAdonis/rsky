@@ -68,6 +68,33 @@ The workspace has two categories of crates:
 | `rsky-pdsadmin` | Admin client for PDS management | — |
 | `rsky-video` | Video processing service | — |
 
+## Intentional Divergence from Upstream `@atproto/pds`
+
+rsky-pds is a Rust reimplementation of the AT Protocol PDS, not a port of the TypeScript reference implementation. Several design decisions diverge intentionally and permanently from upstream:
+
+### Storage: Postgres-only (locked 2026-04-28)
+
+Upstream `@atproto/pds` defaults to **SQLite for everything**: account-manager DB, sequencer DB, did-cache DB, and per-actor stores (one SQLite file per DID). rsky-pds uses **PostgreSQL for all of these**.
+
+**Consequences:**
+- rsky-pds is **not compatible** with the upstream `installer.sh` or `@atproto/pds` Docker image. Operators cannot swap one for the other without a full data migration.
+- Per-actor isolation on Postgres is achieved via row-level discriminators (`actor_did` column on shared tables) with Postgres Row-Level Security policies — not via separate files.
+- All parity claims against upstream are evaluated via a side-by-side **federation conformance harness** (`k8s/conformance/`) that proves protocol-level equivalence despite the storage divergence.
+
+### Blob storage: S3-compatible object storage
+
+Upstream uses on-disk blob storage under the data directory. rsky-pds uses an S3-compatible backend (tested with GCS HMAC keys). This makes horizontal scaling and cross-provider migration straightforward.
+
+### Email: Mailgun / Resend
+
+Upstream bundles SMTP configuration. rsky-pds uses Mailgun or Resend API keys (`RESEND_API_KEY` env var).
+
+### What this means for contributors
+
+- Do not attempt to add SQLite support to rsky-pds — this is out of scope by design.
+- Protocol-level behavior (firehose output, `getRepo` CAR bytes, XRPC response shapes) MUST match upstream. Storage internals MUST NOT leak into wire format.
+- When in doubt about expected protocol behavior, run the conformance harness.
+
 ## Architecture
 
 ### Core Library Dependency Chain

@@ -83,6 +83,8 @@ pub struct SyncEvt {
     pub did: String,
     pub blocks: Vec<u8>,
     pub rev: String,
+    /// The commit CID (required by subscribeRepos #sync in sync v1.1).
+    pub commit: Cid,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -324,11 +326,13 @@ pub async fn format_seq_account_evt(did: String, status: AccountStatus) -> Resul
 }
 
 pub async fn format_seq_sync_evt(did: String, data: SyncEvtData) -> Result<models::RepoSeq> {
+    let commit_cid = data.cid.clone();
     let blocks = blocks_to_car_file(Some(&data.cid), data.blocks).await?;
     let evt = SyncEvt {
         did,
         rev: data.rev,
         blocks,
+        commit: commit_cid,
     };
     Ok(models::RepoSeq::new(
         evt.did.clone(),

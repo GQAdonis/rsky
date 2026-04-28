@@ -1,8 +1,9 @@
 # KBD Waypoint — social.know-me.tools ATProto Stack
 
-**Active Phase**: phase-2-commit-and-deploy  
-**Last updated**: 2026-04-27 by claude-code (kbd-plan)  
-**Phase status**: PLANNED  
+**Active Phase**: phase-2-commit-and-deploy (IN_PROGRESS)
+**Queued Phase**: phase-3-pds-feature-parity (PLANNED, gated on phase-2 completion)
+**Last updated**: 2026-04-28 by claude-code (kbd-plan phase-3)
+**Phase status**: phase-2 IN_PROGRESS, phase-3 PLANNED
 
 ## Exact Next Command
 
@@ -51,3 +52,40 @@ p2-c007  Smoke test all endpoints         → HUMAN        (operational, needs p
 | DNS | Cloudflare grey-cloud (DNS-only) required for cert issuance |
 | Relay bind | Patched to `0.0.0.0` in `rsky-relay/src/server/server.rs` |
 | Relay storage | WORKDIR=/data matches PVC mountPath — all CWD-relative paths go to PV |
+
+## Queued: phase-3-pds-feature-parity
+
+Phase 3 is fully planned. Do not begin execution until phase-2 finishes (p2-c003 → p2-c007 complete, smoke tests green).
+
+**Reference baseline:** upstream `@atproto/pds@0.4.220` (commit `877e629`, 2026-04-24).
+**Storage decision:** Postgres-only for everything (locked 2026-04-28). SQLite parity is out of scope.
+
+**Phase-3 execution order (12 OpenSpec changes):**
+
+```
+p3-c001  Document Postgres-only divergence              → claude-code  (XS)
+p3-c002  Low-effort sweep (5 unimplemented!() + did:web + uploads + getBlob + ozone proxy + requestCrawl)  → claude-code  (S)
+p3-c003  used-refresh-token replay defense              → claude-code  (S)
+p3-c004  Sequencer race fix + recovery hardening        → claude-code  (S)
+p3-c005  rsky-lexicon refresh against upstream HEAD     → cursor       (M)
+p3-c006  rsky-repo sync v1.1                            → claude-code  (M)  needs p3-c005
+p3-c007  actor_store per-DID isolation hardening        → claude-code  (M)
+p3-c008  Federation conformance harness                 → claude-code  (M)  needs p3-c004 + p3-c006 + p3-c007
+p3-c009  OAuth provider core (PAR/authorize/token/JWKS) → claude-code  (XL) needs p3-c011
+p3-c010  oauth-scopes Rust port                         → claude-code  (M)
+p3-c011  Account-manager OAuth schema                   → claude-code  (M)  needs p3-c010
+p3-c012  Wire OAuth into auth_verifier + pipethrough    → claude-code  (M)  needs p3-c009 + p3-c010 + p3-c011
+```
+
+**Phase-3 next command (after phase-2 done):**
+
+```
+/kbd-execute phase-3-pds-feature-parity
+```
+
+## OpenSpec health (post phase-3 plan)
+
+- `openspec validate --all` → **34/34 passing** (30 changes + 4 capability specs)
+- Capability specs: `pds-server` (new), `service-images`, `kubernetes-deployment`, `web-client`
+- 18 pre-existing phases-0/1/2 changes were retrofitted into OpenSpec format on 2026-04-28
+- OpenSpec tools configured: `claude-code`, `codex`, `opencode`, `windsurf`, `cursor`

@@ -289,9 +289,8 @@ impl UseCodeKeyset {
         }
     }
 
-    // @TODO: Fix issues with `invitecodeuse.count() as uses` subquery
     pub async fn paginate(&self, _opts: KeySetPaginateOpts) -> Result<Vec<CodeDetail>> {
-        unimplemented!()
+        anyhow::bail!("invite code pagination by time is not yet implemented")
     }
 }
 
@@ -324,7 +323,7 @@ async fn inner_get_invite_codes(
             (result, keyset.pack_from_result(time_code_results)?)
         }
         Some(sort) if sort == "usage" => {
-            unimplemented!()
+            bail!("sort=usage is not yet implemented")
         }
         _ => bail!("Unknown sort method: {:?}", sort),
     };

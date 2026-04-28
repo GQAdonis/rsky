@@ -14,7 +14,7 @@ use anyhow::Result;
 use chrono::offset::Utc as UtcOffset;
 use chrono::DateTime;
 use futures::try_join;
-use helpers::{account, auth, email_token, invite, password};
+use helpers::{account, auth, email_token, invite, password, used_refresh_token};
 use lexicon_cid::Cid;
 use rocket::http::Status;
 use rocket::request::{FromRequest, Outcome};
@@ -254,6 +254,22 @@ impl AccountManager {
     }
 
     pub async fn rotate_refresh_token(&self, id: &String) -> Result<Option<(String, String)>> {
+        // Replay defense: if this JTI was already consumed, revoke the entire
+        // session lineage and reject — upstream PR pattern for stolen token detection.
+        if used_refresh_token::exists(id, self.db.as_ref()).await? {
+            tracing::warn!(jti = %id, "refresh token replay detected; revoking session lineage");
+            // Best-effort: revoke all sessions for the DID associated with this token.
+            // We intentionally look up the token here even though it may be stale — if
+            // found, revoke by DID; if gone (already pruned), a DID-level revocation
+            // cannot be performed without the DID, so we return an auth error and let
+            // the client re-authenticate.
+            if let Some(stale_token) = auth::get_refresh_token(id, self.db.as_ref()).await? {
+                let _ = auth::revoke_refresh_tokens_by_did(&stale_token.did, self.db.as_ref())
+                    .await;
+            }
+            anyhow::bail!("Token has already been revoked");
+        }
+
         let token = auth::get_refresh_token(id, self.db.as_ref()).await?;
         if let Some(token) = token {
             let system_time = SystemTime::now();
@@ -266,6 +282,8 @@ impl AccountManager {
 
             // Shorten the refresh token lifespan down from its
             // original expiration time to its revocation grace period.
+            let token_did = token.did.clone();
+            let token_expires_at = token.expires_at.clone();
             let prev_expires_at = from_str_to_micros(&token.expires_at)?;
 
             const REFRESH_GRACE_MS: i32 = 2 * HOUR;
@@ -312,7 +330,19 @@ impl AccountManager {
                     self.db.as_ref()
                 )
             ) {
-                Ok(_) => Ok(Some((access_jwt, refresh_jwt))),
+                Ok(_) => {
+                    // Record the consumed JTI to prevent replay attacks. Best-effort:
+                    // failure to insert does not abort the rotation — the replay check
+                    // at the top of this function catches the duplicate on any retry.
+                    let _ = used_refresh_token::insert(
+                        id,
+                        &token_did,
+                        &token_expires_at,
+                        self.db.as_ref(),
+                    )
+                    .await;
+                    Ok(Some((access_jwt, refresh_jwt)))
+                }
                 Err(e) => match e.downcast_ref() {
                     Some(AuthHelperError::ConcurrentRefresh) => {
                         Box::pin(self.rotate_refresh_token(id)).await

@@ -144,42 +144,58 @@ impl Sequencer {
         for row in rows {
             let time = row.sequenced_at;
             match row.seq {
-                None => continue, // should never hit this because of WHERE clause
+                None => continue,
                 Some(seq) => match row.event_type.as_str() {
                     "append" | "rebase" => {
-                        seq_evts.push(SeqEvt::TypedCommitEvt(TypedCommitEvt {
-                            r#type: "commit".to_string(),
-                            seq,
-                            time,
-                            evt: cbor_to_struct(row.event)?,
-                        }));
+                        // Skip rows with corrupt or undecodable commit data rather than
+                        // crashing the sequencer stream (upstream recovery-hardening pattern).
+                        match cbor_to_struct(row.event) {
+                            Ok(evt) => seq_evts.push(SeqEvt::TypedCommitEvt(TypedCommitEvt {
+                                r#type: "commit".to_string(),
+                                seq,
+                                time,
+                                evt,
+                            })),
+                            Err(e) => {
+                                tracing::warn!(seq, "skipping undecodable commit seq event: {e}");
+                            }
+                        }
                     }
-                    "sync" => {
-                        seq_evts.push(SeqEvt::TypedSyncEvt(TypedSyncEvt {
+                    "sync" => match cbor_to_struct(row.event) {
+                        Ok(evt) => seq_evts.push(SeqEvt::TypedSyncEvt(TypedSyncEvt {
                             r#type: "sync".to_string(),
                             seq,
                             time,
-                            evt: cbor_to_struct(row.event)?,
-                        }));
-                    }
-                    "identity" => {
-                        seq_evts.push(SeqEvt::TypedIdentityEvt(TypedIdentityEvt {
+                            evt,
+                        })),
+                        Err(e) => {
+                            tracing::warn!(seq, "skipping undecodable sync seq event: {e}");
+                        }
+                    },
+                    "identity" => match cbor_to_struct(row.event) {
+                        Ok(evt) => seq_evts.push(SeqEvt::TypedIdentityEvt(TypedIdentityEvt {
                             r#type: "identity".to_string(),
                             seq,
                             time,
-                            evt: cbor_to_struct(row.event)?,
-                        }));
-                    }
-                    "account" => {
-                        seq_evts.push(SeqEvt::TypedAccountEvt(TypedAccountEvt {
+                            evt,
+                        })),
+                        Err(e) => {
+                            tracing::warn!(seq, "skipping undecodable identity seq event: {e}");
+                        }
+                    },
+                    "account" => match cbor_to_struct(row.event) {
+                        Ok(evt) => seq_evts.push(SeqEvt::TypedAccountEvt(TypedAccountEvt {
                             r#type: "account".to_string(),
                             seq,
                             time,
-                            evt: cbor_to_struct(row.event)?,
-                        }));
-                    }
-                    _ => {
-                        eprintln!("ERROR: request_seq_range invalid event type");
+                            evt,
+                        })),
+                        Err(e) => {
+                            tracing::warn!(seq, "skipping undecodable account seq event: {e}");
+                        }
+                    },
+                    unknown => {
+                        tracing::warn!(seq, "unknown sequencer event type: {unknown}");
                     }
                 },
             }
@@ -204,14 +220,25 @@ impl Sequencer {
         use crate::schema::pds::repo_seq::dsl as RepoSeqSchema;
         let conn = &mut establish_connection_for_sequencer()?;
 
-        let res = insert_into(RepoSeqSchema::repo_seq)
-            .values((
-                RepoSeqSchema::did.eq(evt.did),
-                RepoSeqSchema::event.eq(evt.event),
-                RepoSeqSchema::eventType.eq(evt.event_type),
-                RepoSeqSchema::sequencedAt.eq(evt.sequenced_at),
+        // Serialize concurrent writes for the same DID using a transaction-level
+        // advisory lock keyed on the DID hash. This prevents out-of-order seq
+        // numbers when two requests for the same DID race (upstream PR #3580).
+        let res = conn.transaction::<models::RepoSeq, diesel::result::Error, _>(|txn| {
+            diesel::sql_query(format!(
+                "SELECT pg_advisory_xact_lock(hashtext('{}'))",
+                evt.did.replace('\'', "''")
             ))
-            .get_result::<models::RepoSeq>(conn)?;
+            .execute(txn)?;
+
+            insert_into(RepoSeqSchema::repo_seq)
+                .values((
+                    RepoSeqSchema::did.eq(&evt.did),
+                    RepoSeqSchema::event.eq(&evt.event),
+                    RepoSeqSchema::eventType.eq(&evt.event_type),
+                    RepoSeqSchema::sequencedAt.eq(&evt.sequenced_at),
+                ))
+                .get_result::<models::RepoSeq>(txn)
+        })?;
         self.crawlers.notify_of_update().await?;
         Ok(res.seq.expect("Sequence number wasn't updated on insert."))
     }

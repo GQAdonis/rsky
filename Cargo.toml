@@ -2,6 +2,7 @@
 members = [
   "palomar-sync",
   "rsky-common",
+  "rsky-oauth-scopes",
   "rsky-crypto",
   "rsky-feedgen",
   "rsky-firehose",

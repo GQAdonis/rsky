@@ -1,0 +1,488 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  GKE_CLUSTER: client-cluster
+  GKE_REGION: us-central1
+  REGISTRY: ghcr.io/know-me-tools
+
+jobs:
+  # ── Build images in parallel ────────────────────────────────────────────────
+  build-pds:
+    name: Build rsky-pds
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      contains(toJson(github.event.commits), '"rsky-pds/') ||
+      contains(toJson(github.event.commits), '"rsky-common/') ||
+      contains(toJson(github.event.commits), '"rsky-lexicon/') ||
+      contains(toJson(github.event.commits), '"rsky-repo/') ||
+      contains(toJson(github.event.commits), '"Cargo.lock"')
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/rsky-pds
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: rsky-pds/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=rsky-pds
+          cache-to: type=gha,mode=max,scope=rsky-pds
+
+  build-relay:
+    name: Build rsky-relay
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      contains(toJson(github.event.commits), '"rsky-relay/') ||
+      contains(toJson(github.event.commits), '"rsky-common/') ||
+      contains(toJson(github.event.commits), '"rsky-firehose/') ||
+      contains(toJson(github.event.commits), '"Cargo.lock"')
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/rsky-relay
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: rsky-relay/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=rsky-relay
+          cache-to: type=gha,mode=max,scope=rsky-relay
+
+  build-feedgen:
+    name: Build rsky-feedgen
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      contains(toJson(github.event.commits), '"rsky-feedgen/') ||
+      contains(toJson(github.event.commits), '"Cargo.lock"')
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/rsky-feedgen
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: rsky-feedgen/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=rsky-feedgen
+          cache-to: type=gha,mode=max,scope=rsky-feedgen
+
+  build-labeler:
+    name: Build rsky-labeler
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      contains(toJson(github.event.commits), '"rsky-labeler/') ||
+      contains(toJson(github.event.commits), '"Cargo.lock"')
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/rsky-labeler
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: rsky-labeler/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=rsky-labeler
+          cache-to: type=gha,mode=max,scope=rsky-labeler
+
+  build-jetstream:
+    name: Build rsky-jetstream-subscriber
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      contains(toJson(github.event.commits), '"rsky-jetstream-subscriber/') ||
+      contains(toJson(github.event.commits), '"Cargo.lock"')
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/rsky-jetstream-subscriber
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: rsky-jetstream-subscriber/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=rsky-jetstream-subscriber
+          cache-to: type=gha,mode=max,scope=rsky-jetstream-subscriber
+
+  build-web-client:
+    name: Build web-client
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      contains(toJson(github.event.commits), '"web-client/') ||
+      contains(toJson(github.event.commits), '"Dockerfile.web-client"')
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/web-client
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.web-client
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=web-client
+          cache-to: type=gha,mode=max,scope=web-client
+          build-args: |
+            NEXT_PUBLIC_ATP_SERVICE_URL=https://pds.know-me.tools
+            NEXT_PUBLIC_ATP_APPVIEW_URL=https://api.bsky.app
+
+  # ── Deploy all services to GKE ─────────────────────────────────────────────
+  deploy:
+    name: Deploy to GKE
+    runs-on: ubuntu-latest
+    needs:
+      - build-pds
+      - build-relay
+      - build-feedgen
+      - build-labeler
+      - build-jetstream
+      - build-web-client
+    # Run deploy even if some build jobs were skipped (path-filtered)
+    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GKE_SA_KEY }}
+
+      - name: Set up gcloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Install gke-gcloud-auth-plugin
+        run: gcloud components install gke-gcloud-auth-plugin --quiet
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
+            --region ${{ env.GKE_REGION }} \
+            --project ${{ secrets.GKE_PROJECT_ID }}
+
+      # ── Namespace ─────────────────────────────────────────────────────────
+      - name: Apply namespace
+        run: kubectl apply -f k8s/namespace.yaml
+
+      # ── GHCR pull secret ─────────────────────────────────────────────────
+      - name: Create GHCR image pull secret
+        run: |
+          kubectl create secret docker-registry ghcr-pull-secret \
+            --namespace atproto \
+            --docker-server=ghcr.io \
+            --docker-username=${{ github.actor }} \
+            --docker-password=${{ secrets.GHCR_PAT }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      # ── StorageClass ─────────────────────────────────────────────────────
+      - name: Apply StorageClass
+        run: kubectl apply -f k8s/postgresql/storageclass.yaml
+
+      # ── Secrets (envsubst fills ${VAR} placeholders) ──────────────────────
+      - name: Substitute and apply secrets
+        env:
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          PDS_ADMIN_PASS: ${{ secrets.PDS_ADMIN_PASS }}
+          PDS_JWT_KEY_K256_PRIVATE_KEY_HEX: ${{ secrets.PDS_JWT_KEY_K256_PRIVATE_KEY_HEX }}
+          PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX: ${{ secrets.PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX }}
+          PDS_REPO_SIGNING_KEY_K256_PRIVATE_KEY_HEX: ${{ secrets.PDS_REPO_SIGNING_KEY_K256_PRIVATE_KEY_HEX }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          GCS_HMAC_ACCESS_KEY: ${{ secrets.GCS_HMAC_ACCESS_KEY }}
+          GCS_HMAC_SECRET_KEY: ${{ secrets.GCS_HMAC_SECRET_KEY }}
+          GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
+          RELAY_ADMIN_PASSWORD: ${{ secrets.RELAY_ADMIN_PASSWORD }}
+          RSKY_API_KEY: ${{ secrets.RSKY_API_KEY }}
+          MOD_SERVICE_DID: ${{ secrets.MOD_SERVICE_DID }}
+          MOD_SERVICE_EMAIL: ${{ secrets.MOD_SERVICE_EMAIL }}
+          MOD_SERVICE_PASSWORD: ${{ secrets.MOD_SERVICE_PASSWORD }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+        run: |
+          envsubst < k8s/postgresql/secret.yaml              | kubectl apply -f -
+          envsubst < k8s/rsky-pds/secret.yaml                | kubectl apply -f -
+          envsubst < k8s/rsky-relay/secret.yaml              | kubectl apply -f -
+          envsubst < k8s/rsky-feedgen/secret.yaml            | kubectl apply -f -
+          envsubst < k8s/rsky-labeler/secret.yaml            | kubectl apply -f -
+          envsubst < k8s/rsky-jetstream-subscriber/secret.yaml | kubectl apply -f -
+          envsubst < k8s/web-client/secret.yaml              | kubectl apply -f -
+
+      # ── PostgreSQL ────────────────────────────────────────────────────────
+      - name: Apply PostgreSQL manifests
+        run: |
+          kubectl apply -f k8s/postgresql/initdb-configmap.yaml
+          kubectl apply -f k8s/postgresql/service.yaml
+          kubectl apply -f k8s/postgresql/statefulset.yaml
+
+      - name: Wait for PostgreSQL ready
+        run: |
+          kubectl rollout status statefulset/postgresql \
+            -n atproto --timeout=300s
+
+      # ── rsky-pds ─────────────────────────────────────────────────────────
+      - name: Apply rsky-pds manifests
+        run: |
+          kubectl apply -f k8s/rsky-pds/configmap.yaml
+          kubectl apply -f k8s/rsky-pds/service.yaml
+          kubectl apply -f k8s/rsky-pds/gateway.yaml
+          kubectl apply -f k8s/rsky-pds/certificate.yaml
+          kubectl apply -f k8s/rsky-pds/httproute-https.yaml
+          kubectl apply -f k8s/rsky-pds/httproute-redirect.yaml
+
+      - name: Deploy rsky-pds StatefulSet
+        run: |
+          IMAGE_TAG="${{ needs.build-pds.outputs.image_tag }}"
+          if [ -z "$IMAGE_TAG" ]; then
+            IMAGE_TAG=$(kubectl get statefulset rsky-pds -n atproto \
+              -o jsonpath='{.spec.template.spec.containers[0].image}' \
+              2>/dev/null | cut -d: -f2 || echo "latest")
+          fi
+          sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-pds/statefulset.yaml \
+            | kubectl apply -f -
+
+      # ── rsky-relay ────────────────────────────────────────────────────────
+      - name: Apply rsky-relay manifests
+        run: |
+          kubectl apply -f k8s/rsky-relay/service.yaml
+          kubectl apply -f k8s/rsky-relay/gateway.yaml
+          kubectl apply -f k8s/rsky-relay/certificate.yaml
+          kubectl apply -f k8s/rsky-relay/httproute-https.yaml
+          kubectl apply -f k8s/rsky-relay/httproute-redirect.yaml
+
+      - name: Deploy rsky-relay StatefulSet
+        run: |
+          IMAGE_TAG="${{ needs.build-relay.outputs.image_tag }}"
+          if [ -z "$IMAGE_TAG" ]; then
+            IMAGE_TAG=$(kubectl get statefulset rsky-relay -n atproto \
+              -o jsonpath='{.spec.template.spec.containers[0].image}' \
+              2>/dev/null | cut -d: -f2 || echo "latest")
+          fi
+          sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-relay/statefulset.yaml \
+            | kubectl apply -f -
+
+      # ── rsky-feedgen ──────────────────────────────────────────────────────
+      - name: Apply rsky-feedgen manifests
+        run: |
+          kubectl apply -f k8s/rsky-feedgen/configmap.yaml
+          kubectl apply -f k8s/rsky-feedgen/service.yaml
+          kubectl apply -f k8s/rsky-feedgen/gateway.yaml
+          kubectl apply -f k8s/rsky-feedgen/certificate.yaml
+          kubectl apply -f k8s/rsky-feedgen/httproute-https.yaml
+          kubectl apply -f k8s/rsky-feedgen/httproute-redirect.yaml
+
+      - name: Deploy rsky-feedgen Deployment
+        run: |
+          IMAGE_TAG="${{ needs.build-feedgen.outputs.image_tag }}"
+          if [ -z "$IMAGE_TAG" ]; then
+            IMAGE_TAG=$(kubectl get deployment rsky-feedgen -n atproto \
+              -o jsonpath='{.spec.template.spec.containers[0].image}' \
+              2>/dev/null | cut -d: -f2 || echo "latest")
+          fi
+          sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-feedgen/deployment.yaml \
+            | kubectl apply -f -
+
+      # ── rsky-labeler ──────────────────────────────────────────────────────
+      - name: Apply rsky-labeler manifests
+        run: |
+          kubectl apply -f k8s/rsky-labeler/configmap.yaml
+
+      - name: Deploy rsky-labeler Deployment
+        run: |
+          IMAGE_TAG="${{ needs.build-labeler.outputs.image_tag }}"
+          if [ -z "$IMAGE_TAG" ]; then
+            IMAGE_TAG=$(kubectl get deployment rsky-labeler -n atproto \
+              -o jsonpath='{.spec.template.spec.containers[0].image}' \
+              2>/dev/null | cut -d: -f2 || echo "latest")
+          fi
+          sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-labeler/deployment.yaml \
+            | kubectl apply -f -
+
+      # ── rsky-jetstream-subscriber ─────────────────────────────────────────
+      - name: Apply rsky-jetstream-subscriber manifests
+        run: |
+          kubectl apply -f k8s/rsky-jetstream-subscriber/configmap.yaml
+
+      - name: Deploy rsky-jetstream-subscriber Deployment
+        run: |
+          IMAGE_TAG="${{ needs.build-jetstream.outputs.image_tag }}"
+          if [ -z "$IMAGE_TAG" ]; then
+            IMAGE_TAG=$(kubectl get deployment rsky-jetstream-subscriber -n atproto \
+              -o jsonpath='{.spec.template.spec.containers[0].image}' \
+              2>/dev/null | cut -d: -f2 || echo "latest")
+          fi
+          sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-jetstream-subscriber/deployment.yaml \
+            | kubectl apply -f -
+
+      # ── web-client ────────────────────────────────────────────────────────
+      - name: Apply web-client manifests
+        run: |
+          kubectl apply -f k8s/web-client/configmap.yaml
+          kubectl apply -f k8s/web-client/service.yaml
+          kubectl apply -f k8s/web-client/gateway.yaml
+          kubectl apply -f k8s/web-client/certificate.yaml
+          kubectl apply -f k8s/web-client/httproute-https.yaml
+          kubectl apply -f k8s/web-client/httproute-redirect.yaml
+
+      - name: Deploy web-client Deployment
+        run: |
+          IMAGE_TAG="${{ needs.build-web-client.outputs.image_tag }}"
+          if [ -z "$IMAGE_TAG" ]; then
+            IMAGE_TAG=$(kubectl get deployment web-client -n atproto \
+              -o jsonpath='{.spec.template.spec.containers[0].image}' \
+              2>/dev/null | cut -d: -f2 || echo "latest")
+          fi
+          sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/web-client/deployment.yaml \
+            | kubectl apply -f -
+
+      # ── Rollout waits ─────────────────────────────────────────────────────
+      - name: Wait for rollouts
+        run: |
+          kubectl rollout status statefulset/rsky-pds \
+            -n atproto --timeout=600s
+          kubectl rollout status statefulset/rsky-relay \
+            -n atproto --timeout=600s
+          kubectl rollout status deployment/rsky-feedgen \
+            -n atproto --timeout=300s
+          kubectl rollout status deployment/rsky-labeler \
+            -n atproto --timeout=300s
+          kubectl rollout status deployment/rsky-jetstream-subscriber \
+            -n atproto --timeout=300s
+          kubectl rollout status deployment/web-client \
+            -n atproto --timeout=300s
+
+      # ── Debug on failure ──────────────────────────────────────────────────
+      - name: Debug pod state
+        if: failure()
+        run: |
+          echo "=== Pods ==="
+          kubectl get pods -n atproto -o wide
+          echo "=== Events ==="
+          kubectl get events -n atproto --sort-by='.lastTimestamp' | tail -40
+
+      # ── Print Gateway IPs for DNS ─────────────────────────────────────────
+      - name: Print Gateway IPs
+        run: |
+          echo "=== Gateway LoadBalancer IPs ==="
+          kubectl get gateway -n atproto \
+            -o custom-columns='NAME:.metadata.name,IP:.status.addresses[0].value'
+          echo ""
+          echo "DNS A records needed:"
+          echo "  pds.know-me.tools     → IP of pds-gateway"
+          echo "  relay.know-me.tools   → IP of relay-gateway"
+          echo "  feed.know-me.tools    → IP of feedgen-gateway"
+          echo "  social.know-me.tools  → IP of web-client-gateway"

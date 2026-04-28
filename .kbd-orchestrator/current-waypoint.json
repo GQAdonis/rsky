@@ -7,7 +7,24 @@
   "preferred_re_entry_skill": "kbd-execute",
   "exact_next_command": "/kbd-execute phase-2-commit-and-deploy",
   "fallback_command": "/kbd-assess phase-2-commit-and-deploy",
-  "last_updated": "2026-04-27T00:00:00Z",
+  "last_updated": "2026-04-28T00:00:00Z",
   "last_updated_by": "claude-code",
-  "notes": "p2-c001 (Ouranos submodule) and p2-c002 (3 commits) DONE. Working tree clean. Waiting on human tasks: p2-c003 (seed 17 GitHub secrets) and p2-c004 (kubectl apply ArgoCD Application) — these can run in parallel. Then p2-c005 (git push origin main), p2-c006 (Cloudflare DNS), p2-c007 (smoke test)."
+  "queued_phases": [
+    {
+      "phase": "phase-3-pds-feature-parity",
+      "status": "PLANNED",
+      "first_change": "p3-c001",
+      "change_count": 12,
+      "next_command": "/kbd-execute phase-3-pds-feature-parity",
+      "execution_gate": "phase-2-commit-and-deploy must finish (p2-c003 through p2-c007) first"
+    }
+  ],
+  "openspec_health": {
+    "validation": "34/34 passing",
+    "capability_specs": ["pds-server", "service-images", "kubernetes-deployment", "web-client"],
+    "total_changes": 30,
+    "openspec_init_done": true,
+    "openspec_tools_configured": ["claude-code", "codex", "opencode", "windsurf", "cursor"]
+  },
+  "notes": "Phase 2 still in flight: p2-c001 (Ouranos submodule) and p2-c002 (3 commits) DONE. Working tree clean. Waiting on human tasks p2-c003 (seed 17 GitHub secrets) and p2-c004 (kubectl apply ArgoCD Application), then p2-c005 (git push origin main), p2-c006 (Cloudflare DNS), p2-c007 (smoke test). Phase 3 is fully planned and staged in OpenSpec (12 changes, capability spec pds-server). All 18 prior phases-0/1/2 changes were retrofitted into OpenSpec format on 2026-04-28. Storage locked Postgres-only for phase 3."
 }

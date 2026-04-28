@@ -14,6 +14,9 @@ pub async fn describe_server() -> Result<Json<DescribeServerOutput>, ApiError> {
     let terms_of_service = env_str("PDS_TERMS_OF_SERVICE_URL");
     let contact_email_address = env_str("PDS_CONTACT_EMAIL_ADDRESS");
 
+    let hostname = env_str("PDS_HOSTNAME");
+    let oauth_issuer = hostname.map(|h| format!("https://{h}"));
+
     Ok(Json(DescribeServerOutput {
         did: env_str("PDS_SERVICE_DID").unwrap(),
         available_user_domains,
@@ -26,5 +29,6 @@ pub async fn describe_server() -> Result<Json<DescribeServerOutput>, ApiError> {
         contact: DescribeServerRefContact {
             email: contact_email_address,
         },
+        oauth_issuer,
     }))
 }

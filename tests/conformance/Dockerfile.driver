@@ -1,0 +1,5 @@
+FROM alpine:3.19
+RUN apk add --no-cache bash curl jq
+COPY run-conformance.sh /run-conformance.sh
+RUN chmod +x /run-conformance.sh
+ENTRYPOINT ["/run-conformance.sh"]

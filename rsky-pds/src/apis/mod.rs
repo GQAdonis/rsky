@@ -19,8 +19,11 @@ impl<'a> FromParam<'a> for Nsid {
     type Error = &'a str;
 
     fn from_param(param: &'a str) -> Result<Self, Self::Error> {
-        // This is how we make sure we allowlist lexicons and what gets proxied
-        if param.starts_with("app.bsky.") || param.starts_with("chat.bsky") {
+        // Allowlist for proxied lexicons — add top-level namespaces as needed
+        if param.starts_with("app.bsky.")
+            || param.starts_with("chat.bsky")
+            || param.starts_with("tools.ozone.")
+        {
             Ok(Nsid(param.to_string()))
         } else {
             Err(param)
@@ -110,6 +113,7 @@ pub enum ApiError {
     BlobNotFound,
     BadRequest(String, String),
     AuthRequiredError(String),
+    NotImplemented,
 }
 
 #[derive(Serialize)]
@@ -433,6 +437,21 @@ impl<'r, 'o: 'r> ::rocket::response::Responder<'r, 'o> for ApiError {
                 res.set_status(Status { code: 404u16 });
                 Ok(res)
             }
+            ApiError::NotImplemented => {
+                let body = Json(ErrorBody {
+                    error: "NotImplemented".to_string(),
+                    message: "This method is not yet implemented".to_string(),
+                });
+                let mut res =
+                    <Json<ErrorBody> as ::rocket::response::Responder>::respond_to(body, __req)?;
+                res.set_header(ContentType(rocket::http::MediaType::const_new(
+                    "application",
+                    "json",
+                    &[],
+                )));
+                res.set_status(Status { code: 501u16 });
+                Ok(res)
+            }
         }
     }
 }
@@ -456,3 +475,4 @@ impl From<handle::errors::Error> for ApiError {
 
 pub mod app;
 pub mod com;
+pub mod oauth;

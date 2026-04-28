@@ -198,6 +198,9 @@ pub struct DescribeServerOutput {
     /// Contact information
     pub contact: DescribeServerRefContact,
     pub did: String,
+    /// OAuth 2.0 authorization server issuer URL for this PDS (RFC 8414 discovery).
+    #[serde(rename = "oauthIssuer", skip_serializing_if = "Option::is_none")]
+    pub oauth_issuer: Option<String>,
 }
 
 /// Get a signed token on behalf of the requesting DID for the requested service.

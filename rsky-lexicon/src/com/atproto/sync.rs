@@ -117,6 +117,8 @@ pub struct SubscribeReposSync {
     pub blocks: Vec<u8>,
     pub rev: String,
     pub time: DateTime<Utc>,
+    /// The commit CID for this sync event (added in subscribeRepos sync v1.1).
+    pub commit: lexicon_cid::Cid,
 }
 
 /// Represents a change to an account's identity. Could be an updated handle, signing key, or
