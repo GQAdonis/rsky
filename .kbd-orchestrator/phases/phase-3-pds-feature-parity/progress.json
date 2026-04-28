@@ -43,7 +43,10 @@
   "deployment_refactor": "DONE",
   "deployment_notes": "ArgoCD removed. Unified deploy.yml (conduit pattern) replaces ArgoCD + 6 standalone build workflows.",
   "next_pending_change": null,
+  "did_subsystem_phase1": "DONE",
+  "did_subsystem_notes": "Phase 1 complete (2026-04-28): async DidResolver trait, DidCapability tiers, CompositeDidResolver, ATProto DID Profile validator, did:plc + did:web trait impls, extended DidDocument (DID Core verification relationships), Service.service_endpoint promoted to serde_json::Value. All workspace crates compile clean. Commit: 2f5a39a.",
+  "did_subsystem_phases_remaining": ["Phase 2 — did:key + did:peer resolvers", "Phase 3 — UAR/A2A agent DID routing", "Phase 4 — federation metadata advertisement"],
   "next_skill": "kbd-assess",
   "next_command": "/kbd-assess phase-3-pds-feature-parity",
-  "notes": "All 12 changes executed (11 implemented, 1 delegated). cargo check clean. Phase ready for live verification."
+  "notes": "All 12 parity changes executed (11 implemented, 1 delegated) + DID subsystem Phase 1 complete. cargo check clean across workspace. Phase ready for live verification."
 }
