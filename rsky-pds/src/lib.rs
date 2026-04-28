@@ -204,6 +204,7 @@ pub async fn build_rocket(cfg: Option<RocketConfig>) -> Rocket<Build> {
     };
 
     crate::db::run_migrations(&db_url);
+    crate::config::validate_env_config();
 
     let db: Map<_, Value> = map! {
         "url" => db_url.into(),

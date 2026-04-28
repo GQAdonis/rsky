@@ -180,3 +180,34 @@ impl ServerConfig {
         }
     }
 }
+
+pub fn validate_env_config() {
+    let required = [
+        "PDS_HOSTNAME",
+        "PDS_SERVICE_DID",
+        "PDS_ADMIN_PASS",
+        "PDS_JWT_KEY_K256_PRIVATE_KEY_HEX",
+        "PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX",
+        "PDS_REPO_SIGNING_KEY_K256_PRIVATE_KEY_HEX",
+        "DATABASE_URL",
+    ];
+    for var in &required {
+        if std::env::var(var).unwrap_or_default().is_empty() {
+            panic!("Required env var {var} is not set — refusing to start");
+        }
+    }
+
+    let hostname = std::env::var("PDS_HOSTNAME").unwrap();
+    let handle_domains = env_list("PDS_SERVICE_HANDLE_DOMAINS");
+    if !handle_domains.is_empty() {
+        let covered = handle_domains.iter().any(|d| {
+            let d = d.trim_start_matches('.');
+            hostname.ends_with(d) || hostname == d
+        });
+        assert!(
+            covered,
+            "PDS_HOSTNAME ({hostname}) is not covered by any PDS_SERVICE_HANDLE_DOMAINS ({handle_domains:?}). \
+            Handle validation will reject all registrations."
+        );
+    }
+}

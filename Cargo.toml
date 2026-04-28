@@ -43,7 +43,9 @@ rsky-repo = {path = "rsky-repo", version = "0.0.2"}
 rsky-firehose = {path = "rsky-firehose", version = "0.2.1"}
 
 [profile.release]
-debug = 2  # Or any level from 0 to 2
+debug = 0
+lto = "thin"
+codegen-units = 4
 
 [profile.wasm-dev]
 inherits = "dev"

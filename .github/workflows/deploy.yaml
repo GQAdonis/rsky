@@ -202,6 +202,59 @@ jobs:
             done
           fi
 
+      - name: Smoke test deployed service(s)
+        run: |
+          SVCS=${{ steps.service.outputs.services }}
+
+          smoke_test() {
+            local svc="$1"
+            echo "--- Smoke testing $svc ---"
+            case "$svc" in
+              rsky-pds)
+                curl -sf --retry 5 --retry-delay 3 \
+                  https://pds.know-me.tools/xrpc/_health || \
+                  { echo "SMOKE FAIL: rsky-pds health check failed"; exit 1; }
+                # Verify DB schema is live: admin endpoint must return 200 or 400 (bad auth), never 500
+                STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+                  https://pds.know-me.tools/xrpc/com.atproto.server.createInviteCode \
+                  -H "Content-Type: application/json" \
+                  -H "Authorization: Basic aW52YWxpZA==" \
+                  -d '{"useCount":0}')
+                if [ "$STATUS" = "500" ]; then
+                  echo "SMOKE FAIL: rsky-pds returned 500 — likely missing DB schema"
+                  exit 1
+                fi
+                echo "rsky-pds OK (HTTP $STATUS)"
+                ;;
+              rsky-relay)
+                curl -sf --retry 5 --retry-delay 3 \
+                  https://relay.know-me.tools/_health || \
+                  { echo "SMOKE FAIL: rsky-relay health check failed"; exit 1; }
+                echo "rsky-relay OK"
+                ;;
+              web-client)
+                curl -sf --retry 5 --retry-delay 3 \
+                  https://social.know-me.tools/ || \
+                  { echo "SMOKE FAIL: web-client health check failed"; exit 1; }
+                echo "web-client OK"
+                ;;
+              *)
+                echo "$svc: no smoke test defined, skipping"
+                ;;
+            esac
+          }
+
+          if [ "$SVCS" = "all" ]; then
+            for svc in rsky-pds rsky-relay web-client; do
+              smoke_test "$svc"
+            done
+          else
+            IFS=',' read -ra LIST <<< "$SVCS"
+            for svc in "${LIST[@]}"; do
+              smoke_test "$(echo $svc | xargs)"
+            done
+          fi
+
       - name: Deployment summary
         run: |
           echo "=== Deployed ${{ steps.service.outputs.services }} @ ${{ steps.service.outputs.sha }} ==="
