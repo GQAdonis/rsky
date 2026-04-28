@@ -14,3 +14,4 @@ data:
   ROCKET_ADDRESS: "0.0.0.0"
   AWS_ENDPOINT_URL: "https://storage.googleapis.com"
   AWS_DEFAULT_REGION: "auto"
+  PDS_INVITE_REQUIRED: "false"
