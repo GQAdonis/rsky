@@ -1077,7 +1077,9 @@ pub async fn verify_agent_service_jwt(
     let resolution = composite
         .resolve_for_capability(&iss, &DidCapability::AgentIdentity)
         .await
-        .map_err(|e: DidError| anyhow::anyhow!("AgentJwt: issuer DID not valid for AgentIdentity: {e}"))?;
+        .map_err(|e: DidError| {
+            anyhow::anyhow!("AgentJwt: issuer DID not valid for AgentIdentity: {e}")
+        })?;
 
     // Fetch the signing key from the DID document.
     // For did:key the key is inline; for did:plc it is the #atproto verification method.
@@ -1094,11 +1096,7 @@ pub async fn verify_agent_service_jwt(
     } else {
         // did:plc or other method: look for #atproto in verificationMethod.
         get_verification_material(&resolution.document, &"atproto".to_string())
-            .and_then(|mat| {
-                get_did_key_from_multibase(mat)
-                    .ok()
-                    .and_then(|k| k)
-            })
+            .and_then(|mat| get_did_key_from_multibase(mat).ok().and_then(|k| k))
             .ok_or_else(|| anyhow::anyhow!("AgentJwt: no #atproto key in issuer DID document"))?
     };
 
@@ -1135,12 +1133,7 @@ impl<'r> FromRequest<'r> for AgentAuth {
 
         let service_did = match env_str("PDS_SERVICE_DID") {
             Some(d) => d,
-            None => {
-                return Outcome::Error((
-                    Status::InternalServerError,
-                    ApiError::RuntimeError,
-                ))
-            }
+            None => return Outcome::Error((Status::InternalServerError, ApiError::RuntimeError)),
         };
 
         let composite = request

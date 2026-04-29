@@ -58,9 +58,15 @@ pub struct DidDocument {
     pub authentication: Option<Vec<VerificationMethodRef>>,
     #[serde(rename = "assertionMethod", skip_serializing_if = "Option::is_none")]
     pub assertion_method: Option<Vec<VerificationMethodRef>>,
-    #[serde(rename = "capabilityInvocation", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "capabilityInvocation",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub capability_invocation: Option<Vec<VerificationMethodRef>>,
-    #[serde(rename = "capabilityDelegation", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "capabilityDelegation",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub capability_delegation: Option<Vec<VerificationMethodRef>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service: Option<Vec<Service>>,

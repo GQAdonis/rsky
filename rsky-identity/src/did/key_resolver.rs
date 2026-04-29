@@ -46,18 +46,18 @@ impl DidKeyResolver {
             id: did.to_string(),
             also_known_as: None,
             verification_method: Some(vec![vm]),
-            authentication: Some(vec![
-                crate::types::VerificationMethodRef::Reference(vm_id.clone()),
-            ]),
-            assertion_method: Some(vec![
-                crate::types::VerificationMethodRef::Reference(vm_id.clone()),
-            ]),
-            capability_invocation: Some(vec![
-                crate::types::VerificationMethodRef::Reference(vm_id.clone()),
-            ]),
-            capability_delegation: Some(vec![
-                crate::types::VerificationMethodRef::Reference(vm_id),
-            ]),
+            authentication: Some(vec![crate::types::VerificationMethodRef::Reference(
+                vm_id.clone(),
+            )]),
+            assertion_method: Some(vec![crate::types::VerificationMethodRef::Reference(
+                vm_id.clone(),
+            )]),
+            capability_invocation: Some(vec![crate::types::VerificationMethodRef::Reference(
+                vm_id.clone(),
+            )]),
+            capability_delegation: Some(vec![crate::types::VerificationMethodRef::Reference(
+                vm_id,
+            )]),
             service: None,
         })
     }
@@ -96,9 +96,9 @@ impl DidResolver for DidKeyResolver {
         capability: &DidCapability,
     ) -> Result<(), DidError> {
         match capability {
-            DidCapability::AccountIdentity | DidCapability::OrgIdentity => {
-                Err(DidError::MethodNotPermitted("key".to_string(), capability.clone()))
-            }
+            DidCapability::AccountIdentity | DidCapability::OrgIdentity => Err(
+                DidError::MethodNotPermitted("key".to_string(), capability.clone()),
+            ),
             _ => Ok(()),
         }
     }

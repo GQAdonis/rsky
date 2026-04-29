@@ -113,11 +113,8 @@ impl Resolver {
     }
 
     pub fn expire(&mut self, did: &str, time: DateTime<Utc>) {
-        let stale = self
-            .plc_db
-            .as_ref()
-            .and_then(|(_, _, after)| after.as_deref())
-            .map_or(true, |after| {
+        let stale =
+            self.plc_db.as_ref().and_then(|(_, _, after)| after.as_deref()).map_or(true, |after| {
                 DateTime::parse_from_rfc3339(after).map_or(true, |after| after < time)
             });
         if stale {

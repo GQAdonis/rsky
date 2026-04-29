@@ -15,10 +15,7 @@ impl AtprotoAccountDidProfile {
         let method = &resolution.metadata.method;
 
         // Check that the DID method is permitted for this capability tier.
-        if !capability
-            .permitted_methods()
-            .contains(&method.as_str())
-        {
+        if !capability.permitted_methods().contains(&method.as_str()) {
             return Err(DidError::MethodNotPermitted(
                 method.clone(),
                 capability.clone(),
@@ -80,7 +77,8 @@ impl AtprotoAccountDidProfile {
 
         // Must have an alsoKnownAs entry with a valid handle URI (at:// or https://).
         let has_aka = doc.also_known_as.as_ref().map_or(false, |akas| {
-            akas.iter().any(|a| a.starts_with("at://") || a.starts_with("https://"))
+            akas.iter()
+                .any(|a| a.starts_with("at://") || a.starts_with("https://"))
         });
         if !has_aka {
             return Err(DidError::ProfileConstraintViolated(

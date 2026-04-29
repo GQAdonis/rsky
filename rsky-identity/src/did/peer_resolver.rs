@@ -104,9 +104,9 @@ impl DidResolver for DidPeerResolver {
         capability: &DidCapability,
     ) -> Result<(), DidError> {
         match capability {
-            DidCapability::AccountIdentity | DidCapability::OrgIdentity => {
-                Err(DidError::MethodNotPermitted("peer".to_string(), capability.clone()))
-            }
+            DidCapability::AccountIdentity | DidCapability::OrgIdentity => Err(
+                DidError::MethodNotPermitted("peer".to_string(), capability.clone()),
+            ),
             _ => Ok(()),
         }
     }

@@ -30,7 +30,8 @@ impl CompositeDidResolver {
 
     /// Register a resolver for the DID method it reports via `DidResolver::method()`.
     pub fn register(&mut self, resolver: Box<dyn DidResolver>) {
-        self.resolvers.insert(resolver.method().to_string(), resolver);
+        self.resolvers
+            .insert(resolver.method().to_string(), resolver);
     }
 
     /// Build a resolver with all four built-in methods pre-registered.

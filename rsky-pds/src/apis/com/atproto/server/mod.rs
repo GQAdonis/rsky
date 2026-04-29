@@ -77,8 +77,12 @@ pub fn gen_invite_codes(count: i32) -> Vec<String> {
 }
 
 pub fn validate_handle(handle: &str) -> bool {
-    let domains_raw = env::var("PDS_SERVICE_HANDLE_DOMAINS")
-        .unwrap_or_else(|_| format!(".{}", env::var("PDS_HOSTNAME").unwrap_or("localhost".to_owned())));
+    let domains_raw = env::var("PDS_SERVICE_HANDLE_DOMAINS").unwrap_or_else(|_| {
+        format!(
+            ".{}",
+            env::var("PDS_HOSTNAME").unwrap_or("localhost".to_owned())
+        )
+    });
     domains_raw
         .split(',')
         .map(|d| d.trim())

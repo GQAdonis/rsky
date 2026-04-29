@@ -78,10 +78,8 @@ pub async fn prune_expired(now_str: &str, db: &DbConn) -> Result<usize> {
     let now_str = now_str.to_string();
     let deleted = db
         .run(move |conn| {
-            diesel::delete(
-                UrtSchema::used_refresh_token.filter(UrtSchema::expires_at.lt(&now_str)),
-            )
-            .execute(conn)
+            diesel::delete(UrtSchema::used_refresh_token.filter(UrtSchema::expires_at.lt(&now_str)))
+                .execute(conn)
         })
         .await?;
 

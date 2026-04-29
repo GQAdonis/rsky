@@ -204,14 +204,23 @@ mod tests {
     #[test]
     fn scope_permits_xrpc_via_atproto() {
         let granted = ScopeSet::parse("atproto").unwrap();
-        assert!(scope_permits_xrpc(&granted, "com.atproto.repo.createRecord"));
+        assert!(scope_permits_xrpc(
+            &granted,
+            "com.atproto.repo.createRecord"
+        ));
     }
 
     #[test]
     fn scope_permits_xrpc_via_nsid() {
         let granted = ScopeSet::parse("com.atproto.repo.createRecord").unwrap();
-        assert!(scope_permits_xrpc(&granted, "com.atproto.repo.createRecord"));
-        assert!(!scope_permits_xrpc(&granted, "com.atproto.repo.deleteRecord"));
+        assert!(scope_permits_xrpc(
+            &granted,
+            "com.atproto.repo.createRecord"
+        ));
+        assert!(!scope_permits_xrpc(
+            &granted,
+            "com.atproto.repo.deleteRecord"
+        ));
     }
 
     #[test]

@@ -264,8 +264,8 @@ impl AccountManager {
             // cannot be performed without the DID, so we return an auth error and let
             // the client re-authenticate.
             if let Some(stale_token) = auth::get_refresh_token(id, self.db.as_ref()).await? {
-                let _ = auth::revoke_refresh_tokens_by_did(&stale_token.did, self.db.as_ref())
-                    .await;
+                let _ =
+                    auth::revoke_refresh_tokens_by_did(&stale_token.did, self.db.as_ref()).await;
             }
             anyhow::bail!("Token has already been revoked");
         }

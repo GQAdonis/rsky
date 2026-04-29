@@ -75,8 +75,8 @@ impl DidResolver for DidWebResolver {
             .map_err(|e| DidError::NetworkError(e.to_string()))?;
 
         let val = raw.ok_or_else(|| DidError::NotFound(did.to_string()))?;
-        let document = serde_json::from_value(val)
-            .map_err(|e| DidError::MalformedDocument(e.to_string()))?;
+        let document =
+            serde_json::from_value(val).map_err(|e| DidError::MalformedDocument(e.to_string()))?;
 
         Ok(DidResolution {
             did: did.to_string(),

@@ -205,7 +205,10 @@ pub struct DescribeServerOutput {
     ///
     /// Advisory field for federation peers and client libraries. Not yet part of the
     /// official AT Protocol lexicon; included here for forward compatibility.
-    #[serde(rename = "didMethodsSupported", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "didMethodsSupported",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub did_methods_supported: Option<Vec<String>>,
 }
 
