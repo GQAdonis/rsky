@@ -9,6 +9,7 @@ on:
       - 'rsky-feedgen/**'
       - 'rsky-labeler/**'
       - 'rsky-jetstream-subscriber/**'
+      - 'rsky-wintermute/**'
       - 'rsky-common/**'
       - 'rsky-lexicon/**'
       - 'rsky-repo/**'
@@ -234,6 +235,50 @@ jobs:
           cache-from: type=gha,scope=rsky-jetstream-subscriber
           cache-to: type=gha,mode=max,scope=rsky-jetstream-subscriber
 
+  build-wintermute:
+    name: Build rsky-wintermute
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      contains(toJson(github.event.commits), '"rsky-wintermute/') ||
+      contains(toJson(github.event.head_commit), '"rsky-wintermute/') ||
+      contains(toJson(github.event.commits), '"rsky-common/') ||
+      contains(toJson(github.event.head_commit), '"rsky-common/') ||
+      contains(toJson(github.event.commits), '"rsky-identity/') ||
+      contains(toJson(github.event.head_commit), '"rsky-identity/') ||
+      contains(toJson(github.event.commits), '"rsky-repo/') ||
+      contains(toJson(github.event.head_commit), '"rsky-repo/') ||
+      contains(toJson(github.event.commits), '"Cargo.lock"') ||
+      contains(toJson(github.event.head_commit), '"Cargo.lock"')
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/rsky-wintermute
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: rsky-wintermute/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=rsky-wintermute
+          cache-to: type=gha,mode=max,scope=rsky-wintermute
+
   build-web-client:
     name: Build web-client
     runs-on: ubuntu-latest
@@ -285,6 +330,7 @@ jobs:
       - build-feedgen
       - build-labeler
       - build-jetstream
+      - build-wintermute
       - build-web-client
     # Run deploy even if some build jobs were skipped (path-filtered)
     if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
@@ -348,6 +394,7 @@ jobs:
           MOD_SERVICE_PASSWORD: ${{ secrets.MOD_SERVICE_PASSWORD }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
+          WINTERMUTE_RELAY_HOSTS: ${{ secrets.WINTERMUTE_RELAY_HOSTS }}
         run: |
           envsubst < k8s/postgresql/secret.yaml              | kubectl apply -f -
           envsubst < k8s/rsky-pds/secret.yaml                | kubectl apply -f -
@@ -355,6 +402,7 @@ jobs:
           envsubst < k8s/rsky-feedgen/secret.yaml            | kubectl apply -f -
           envsubst < k8s/rsky-labeler/secret.yaml            | kubectl apply -f -
           envsubst < k8s/rsky-jetstream-subscriber/secret.yaml | kubectl apply -f -
+          envsubst < k8s/rsky-wintermute/secret.yaml         | kubectl apply -f -
           envsubst < k8s/web-client/secret.yaml              | kubectl apply -f -
 
       # ── PostgreSQL ────────────────────────────────────────────────────────
@@ -476,6 +524,26 @@ jobs:
           sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-jetstream-subscriber/deployment.yaml \
             | kubectl apply -f -
 
+      # ── rsky-wintermute ───────────────────────────────────────────────────
+      - name: Apply rsky-wintermute manifests
+        run: |
+          kubectl apply -f k8s/rsky-wintermute/service.yaml
+          kubectl apply -f k8s/rsky-wintermute/gateway.yaml
+          kubectl apply -f k8s/rsky-wintermute/certificate.yaml
+          kubectl apply -f k8s/rsky-wintermute/httproute-https.yaml
+          kubectl apply -f k8s/rsky-wintermute/httproute-redirect.yaml
+
+      - name: Deploy rsky-wintermute StatefulSet
+        run: |
+          IMAGE_TAG="${{ needs.build-wintermute.outputs.image_tag }}"
+          if [ -z "$IMAGE_TAG" ]; then
+            IMAGE_TAG=$(kubectl get statefulset rsky-wintermute -n atproto \
+              -o jsonpath='{.spec.template.spec.containers[0].image}' \
+              2>/dev/null | cut -d: -f2 || echo "latest")
+          fi
+          sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-wintermute/statefulset.yaml \
+            | kubectl apply -f -
+
       # ── web-client ────────────────────────────────────────────────────────
       - name: Apply web-client manifests
         run: |
@@ -510,6 +578,8 @@ jobs:
             -n atproto --timeout=300s
           kubectl rollout status deployment/rsky-jetstream-subscriber \
             -n atproto --timeout=300s
+          kubectl rollout status statefulset/rsky-wintermute \
+            -n atproto --timeout=600s
           kubectl rollout status deployment/web-client \
             -n atproto --timeout=300s
 
@@ -533,4 +603,5 @@ jobs:
           echo "  pds.know-me.tools     → IP of pds-gateway"
           echo "  relay.know-me.tools   → IP of relay-gateway"
           echo "  feed.know-me.tools    → IP of feedgen-gateway"
+          echo "  appview.know-me.tools → IP of appview-gateway"
           echo "  social.know-me.tools  → IP of web-client-gateway"

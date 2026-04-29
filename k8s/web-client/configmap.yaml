@@ -5,4 +5,7 @@ metadata:
   namespace: atproto
 data:
   NEXT_PUBLIC_ATP_SERVICE_URL: "https://pds.know-me.tools"
+  # rsky-wintermute is the indexer that populates the AppView database but does
+  # not yet serve app.bsky.* XRPC endpoints. Update this to
+  # https://appview.know-me.tools once the AppView HTTP layer is implemented.
   NEXT_PUBLIC_ATP_APPVIEW_URL: "https://api.bsky.app"

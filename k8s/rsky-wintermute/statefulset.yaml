@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rsky-wintermute
+  namespace: atproto
+  labels:
+    app: rsky-wintermute
+spec:
+  serviceName: rsky-wintermute
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rsky-wintermute
+  template:
+    metadata:
+      labels:
+        app: rsky-wintermute
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: rsky-wintermute
+          image: ghcr.io/know-me-tools/rsky-wintermute:IMAGE_TAG
+          ports:
+            - name: metrics
+              containerPort: 9090
+          envFrom:
+            - secretRef:
+                name: rsky-wintermute-secrets
+          env:
+            - name: METRICS_PORT
+              value: "9090"
+            - name: RUST_LOG
+              value: "info"
+          livenessProbe:
+            httpGet:
+              path: /_health
+              port: 9090
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /_health
+              port: 9090
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "1"
+              memory: 4Gi
+            limits:
+              cpu: "4"
+              memory: 16Gi
+          volumeMounts:
+            - name: rsky-wintermute-data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: rsky-wintermute-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: atproto-ssd-immediate
+        resources:
+          requests:
+            storage: 500Gi
