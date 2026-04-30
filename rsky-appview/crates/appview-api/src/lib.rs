@@ -1,12 +1,19 @@
 mod actor;
 mod feed;
 mod graph;
+mod livekit;
 mod notification;
 mod unspecced;
+mod webrtc;
 
 use appview_core::error::AppViewError;
 use appview_identity::{DidResolver, HandleResolver, HandleResolverOpts};
-use axum::{Router, routing::get};
+use appview_livekit::{BillingGate, LiveKitConfig, TokenMinter};
+use appview_webrtc::SessionStore;
+use axum::{
+    Router,
+    routing::{get, post},
+};
 use sqlx::PgPool;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
@@ -18,6 +25,9 @@ pub struct AppStateInner {
     pub db: PgPool,
     pub did_resolver: Arc<tokio::sync::Mutex<DidResolver>>,
     pub handle_resolver: Arc<tokio::sync::Mutex<HandleResolver>>,
+    pub livekit_minter: Option<TokenMinter>,
+    pub billing_gate: Option<BillingGate>,
+    pub webrtc_sessions: Arc<SessionStore>,
 }
 
 impl AppStateInner {
@@ -30,10 +40,21 @@ impl AppStateInner {
             timeout: Some(std::time::Duration::from_secs(5)),
             backup_nameservers: None,
         });
+
+        let livekit_minter = LiveKitConfig::from_env().ok().map(TokenMinter::new);
+        let billing_gate = if livekit_minter.is_some() {
+            Some(BillingGate::new(db.clone()))
+        } else {
+            None
+        };
+
         Ok(Self {
             db,
             did_resolver: Arc::new(tokio::sync::Mutex::new(did_resolver)),
             handle_resolver: Arc::new(tokio::sync::Mutex::new(handle_resolver)),
+            livekit_minter,
+            billing_gate,
+            webrtc_sessions: SessionStore::new(),
         })
     }
 }
@@ -103,6 +124,12 @@ pub fn create_router(state: AppState) -> Router {
             "/xrpc/app.bsky.unspecced.getPopularFeedGenerators",
             get(unspecced::get_popular_feed_generators),
         )
+        .route(
+            "/xrpc/tools.know-me.live.tokenMint",
+            post(livekit::token_mint),
+        )
+        .route("/xrpc/tools.know-me.video.whip", post(webrtc::whip))
+        .route("/xrpc/tools.know-me.video.whep", post(webrtc::whep))
         .layer(CorsLayer::permissive())
         .with_state(state)
 }

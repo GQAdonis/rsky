@@ -1,4 +1,4 @@
-use crate::{AppState, AppViewError};
+use crate::AppState;
 use appview_core::error::Result;
 use appview_db as db;
 use appview_lexicon::bsky::actor::ProfileViewBasic;

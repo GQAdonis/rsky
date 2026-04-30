@@ -1,4 +1,4 @@
-use crate::{AppState, AppViewError};
+use crate::AppState;
 use appview_auth::Viewer;
 use appview_core::error::Result;
 use appview_db as db;

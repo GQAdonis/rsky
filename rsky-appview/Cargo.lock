@@ -65,6 +65,7 @@ dependencies = [
  "appview-lexicon",
  "appview-livekit",
  "appview-queue",
+ "appview-webrtc",
  "axum",
  "serde",
  "serde_json",
@@ -245,6 +246,15 @@ dependencies = [
 [[package]]
 name = "appview-webrtc"
 version = "0.1.0"
+dependencies = [
+ "appview-core",
+ "chrono",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "uuid",
+]
 
 [[package]]
 name = "arrayref"

@@ -11,6 +11,7 @@ appview-identity = { path = "../appview-identity" }
 appview-labels = { path = "../appview-labels" }
 appview-lexicon = { path = "../appview-lexicon" }
 appview-livekit = { path = "../appview-livekit" }
+appview-webrtc = { path = "../appview-webrtc" }
 appview-queue = { path = "../appview-queue" }
 axum = { workspace = true }
 sqlx = { workspace = true }
