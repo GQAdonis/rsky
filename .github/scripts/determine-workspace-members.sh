@@ -83,26 +83,24 @@ fi
 
 echo "GitHub directory changes: $GITHUB_CHANGES"
 
+# Compute diff files unconditionally for inner workspace detection
+DIFF_FILES=""
+if [[ "$EVENT_NAME" == "pull_request" && -n "$PR_BASE_SHA" && -n "$PR_HEAD_SHA" ]]; then
+    BASE_SHA=$(git merge-base "$PR_BASE_SHA" "$PR_HEAD_SHA" || echo "$PR_BASE_SHA")
+    DIFF_FILES=$(git diff --name-only "$BASE_SHA" "$PR_HEAD_SHA" 2>/dev/null || echo '')
+else
+    DIFF_FILES=$(git diff --name-only HEAD^ HEAD 2>/dev/null || echo '')
+fi
+
 # Get list of packages with changes
 CHANGED_MEMBERS=()
 
 if [[ "$GITHUB_CHANGES" == "true" ]]; then
-    # If .github has changes, include all packages (except skipped ones)
     echo "Changes detected in .github directory, including all packages"
     for pkg in "${WORKSPACE_MEMBERS[@]}"; do
         CHANGED_MEMBERS+=("$pkg")
     done
 else
-    # Otherwise, only include packages with changes
-    DIFF_FILES=""
-    if [[ "$EVENT_NAME" == "pull_request" && -n "$PR_BASE_SHA" && -n "$PR_HEAD_SHA" ]]; then
-        BASE_SHA=$(git merge-base "$PR_BASE_SHA" "$PR_HEAD_SHA" || echo "$PR_BASE_SHA")
-        DIFF_FILES=$(git diff --name-only "$BASE_SHA" "$PR_HEAD_SHA" 2>/dev/null || echo '')
-    else
-        # For push events, compare with the previous commit
-        DIFF_FILES=$(git diff --name-only HEAD^ HEAD 2>/dev/null || echo '')
-    fi
-
     echo "Changed files:"
     echo "$DIFF_FILES"
 
@@ -175,6 +173,7 @@ echo "workspace_members=$JSON_MEMBERS" >> "$GITHUB_OUTPUT"
 echo "Found workspace members to process: $JSON_MEMBERS"
 
 # Detect inner workspace changes (rsky-appview has its own Cargo workspace)
+# Check both CHANGED_MEMBERS and raw diff for rsky-appview paths
 INNER_WS_CHANGES=false
 for pkg in "${CHANGED_MEMBERS[@]}"; do
     if [[ "$pkg" == "rsky-appview" ]]; then
@@ -182,5 +181,10 @@ for pkg in "${CHANGED_MEMBERS[@]}"; do
         break
     fi
 done
+if [[ "$INNER_WS_CHANGES" == "false" ]]; then
+    if echo "$DIFF_FILES" | grep -q "^rsky-appview/"; then
+        INNER_WS_CHANGES=true
+    fi
+fi
 echo "inner_workspace_changes=$INNER_WS_CHANGES" >> "$GITHUB_OUTPUT"
 echo "Inner workspace (rsky-appview) changes: $INNER_WS_CHANGES"
