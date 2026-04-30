@@ -1,11 +1,11 @@
 {
   "active_phase": "phase-2-appview-functional",
-  "phase_status": "PLANNED",
+  "phase_status": "IN_PROGRESS",
   "backend": "opencode",
-  "last_completed_change": null,
-  "next_pending_change": "c016-indexer-crud",
+  "last_completed_change": "c020-livekit-token",
+  "next_pending_change": "c021-webrtc-signaling",
   "last_updated_by": "opencode",
-  "last_updated": "2026-04-29T00:00:00Z",
+  "last_updated": "2026-04-30T03:00:00Z",
   "preferred_re_entry_skill": "kbd-process-orchestrator",
   "exact_next_command": "/kbd-execute phase-2-appview-functional",
   "fallback_command": "/kbd-status"

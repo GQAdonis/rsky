@@ -10,6 +10,56 @@ You have access to Superpowers skills.
 </IMPORTANT>
 <!-- /superpowers-codex bootstrap -->
 
+## Agent Operating Protocol
+
+### 1. Skill Loading (Every Turn)
+
+Before taking any action in each turn, identify ALL skills that might be relevant to the work at hand, then **load the top 3 most relevant**. Examples:
+
+| Task | Likely Skills |
+|---|---|
+| Writing Rust code | `rust-patterns`, `async-patterns`, `error-handling` |
+| Writing tests | `rust-testing`, `tdd-workflow`, `verification-loop` |
+| Designing APIs | `api-design`, `axum-patterns` |
+| Debugging build errors | `systematic-debugging`, `rust-patterns` |
+| Planning work | `writing-plans`, `blueprint` |
+
+Do not skip this step. Skill loading ensures idiomatic, high-quality output that improves iteratively.
+
+### 2. Karpathy Guidelines
+
+Follow the **karpathy-guidelines** skill principles on every code generation turn:
+
+- **Surgical changes**: Make the smallest possible diff. Do not refactor surrounding code unless it directly blocks the change.
+- **Surface assumptions**: Before writing code, state key assumptions explicitly. If unsure, ask.
+- **Define success criteria**: Before implementing, define how to verify the change works (compile check, test, CI).
+- **Avoid overcomplication**: Prefer the simplest solution that satisfies the requirement. Do not add abstractions, generics, or indirection unless clearly needed now.
+- **Verify after every change**: Run `cargo check`, `cargo fmt`, or `cargo clippy` after modifying files. Never claim a change is done without verification.
+
+### 3. Progress Reporting (Every Turn)
+
+At the end of **every turn** — whether code generation, research, debugging, or planning — append a structured status block:
+
+```markdown
+---
+## Status
+
+**Task**: [current task name from the task list]
+**Phase**: [phase name if applicable]
+**Progress**: [X/Y complete] — [brief description of what was done this turn]
+
+### Checklist (ordered)
+- [x] Step 1 — description
+- [x] Step 2 — description
+- [ ] Step 3 — description *(next)*
+- [ ] Step 4 — description
+
+**Next**: [what the next turn should do]
+**Blockers**: [any blockers, or "none"]
+```
+
+This ensures every turn ends with a clear picture of where we are, what just happened, and what comes next. Never omit this block.
+
 # Repository Instructions
 
 ## What This Repository Is
