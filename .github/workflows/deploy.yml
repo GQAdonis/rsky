@@ -489,11 +489,7 @@ jobs:
       - name: Deploy rsky-pds StatefulSet
         run: |
           IMAGE_TAG="${{ needs.build-pds.outputs.image_tag }}"
-          if [ -z "$IMAGE_TAG" ]; then
-            IMAGE_TAG=$(kubectl get statefulset rsky-pds -n atproto \
-              -o jsonpath='{.spec.template.spec.containers[0].image}' \
-              2>/dev/null | cut -d: -f2 || echo "latest")
-          fi
+          : "${IMAGE_TAG:=latest}"
           sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-pds/statefulset.yaml \
             | kubectl apply -f -
 
@@ -509,11 +505,7 @@ jobs:
       - name: Deploy rsky-relay StatefulSet
         run: |
           IMAGE_TAG="${{ needs.build-relay.outputs.image_tag }}"
-          if [ -z "$IMAGE_TAG" ]; then
-            IMAGE_TAG=$(kubectl get statefulset rsky-relay -n atproto \
-              -o jsonpath='{.spec.template.spec.containers[0].image}' \
-              2>/dev/null | cut -d: -f2 || echo "latest")
-          fi
+          : "${IMAGE_TAG:=latest}"
           sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-relay/statefulset.yaml \
             | kubectl apply -f -
 
@@ -530,11 +522,7 @@ jobs:
       - name: Deploy rsky-feedgen Deployment
         run: |
           IMAGE_TAG="${{ needs.build-feedgen.outputs.image_tag }}"
-          if [ -z "$IMAGE_TAG" ]; then
-            IMAGE_TAG=$(kubectl get deployment rsky-feedgen -n atproto \
-              -o jsonpath='{.spec.template.spec.containers[0].image}' \
-              2>/dev/null | cut -d: -f2 || echo "latest")
-          fi
+          : "${IMAGE_TAG:=latest}"
           sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-feedgen/deployment.yaml \
             | kubectl apply -f -
 
@@ -546,11 +534,7 @@ jobs:
       - name: Deploy rsky-labeler Deployment
         run: |
           IMAGE_TAG="${{ needs.build-labeler.outputs.image_tag }}"
-          if [ -z "$IMAGE_TAG" ]; then
-            IMAGE_TAG=$(kubectl get deployment rsky-labeler -n atproto \
-              -o jsonpath='{.spec.template.spec.containers[0].image}' \
-              2>/dev/null | cut -d: -f2 || echo "latest")
-          fi
+          : "${IMAGE_TAG:=latest}"
           sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-labeler/deployment.yaml \
             | kubectl apply -f -
 
@@ -562,11 +546,7 @@ jobs:
       - name: Deploy rsky-jetstream-subscriber Deployment
         run: |
           IMAGE_TAG="${{ needs.build-jetstream.outputs.image_tag }}"
-          if [ -z "$IMAGE_TAG" ]; then
-            IMAGE_TAG=$(kubectl get deployment rsky-jetstream-subscriber -n atproto \
-              -o jsonpath='{.spec.template.spec.containers[0].image}' \
-              2>/dev/null | cut -d: -f2 || echo "latest")
-          fi
+          : "${IMAGE_TAG:=latest}"
           sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-jetstream-subscriber/deployment.yaml \
             | kubectl apply -f -
 
@@ -582,11 +562,7 @@ jobs:
       - name: Deploy rsky-wintermute StatefulSet
         run: |
           IMAGE_TAG="${{ needs.build-wintermute.outputs.image_tag }}"
-          if [ -z "$IMAGE_TAG" ]; then
-            IMAGE_TAG=$(kubectl get statefulset rsky-wintermute -n atproto \
-              -o jsonpath='{.spec.template.spec.containers[0].image}' \
-              2>/dev/null | cut -d: -f2 || echo "latest")
-          fi
+          : "${IMAGE_TAG:=latest}"
           sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-wintermute/statefulset.yaml \
             | kubectl apply -f -
 
@@ -599,11 +575,7 @@ jobs:
       - name: Deploy rsky-appview StatefulSet
         run: |
           IMAGE_TAG="${{ needs.build-appview.outputs.image_tag }}"
-          if [ -z "$IMAGE_TAG" ]; then
-            IMAGE_TAG=$(kubectl get statefulset rsky-appview -n atproto \
-              -o jsonpath='{.spec.template.spec.containers[0].image}' \
-              2>/dev/null | cut -d: -f2 || echo "latest")
-          fi
+          : "${IMAGE_TAG:=latest}"
           sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-appview/statefulset.yaml \
             | kubectl apply -f -
 
@@ -620,11 +592,7 @@ jobs:
       - name: Deploy web-client Deployment
         run: |
           IMAGE_TAG="${{ needs.build-web-client.outputs.image_tag }}"
-          if [ -z "$IMAGE_TAG" ]; then
-            IMAGE_TAG=$(kubectl get deployment web-client -n atproto \
-              -o jsonpath='{.spec.template.spec.containers[0].image}' \
-              2>/dev/null | cut -d: -f2 || echo "latest")
-          fi
+          : "${IMAGE_TAG:=latest}"
           sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/web-client/deployment.yaml \
             | kubectl apply -f -
 
