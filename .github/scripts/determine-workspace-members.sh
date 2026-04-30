@@ -34,8 +34,9 @@ if grep -q '\[workspace\]' Cargo.toml; then
   # Extract member paths - handle both array and table formats
   if echo "$MEMBERS_SECTION" | grep -q 'members.*=.*\['; then
     # Array format: members = ["pkg1", "pkg2"]
-    MEMBERS_LIST=$(echo "$MEMBERS_SECTION" | grep -o '"[^"]*"' | tr -d '"')
-    readarray -t WORKSPACE_MEMBERS <<< "$MEMBERS_LIST"
+    while IFS= read -r member; do
+      [[ -n "$member" ]] && WORKSPACE_MEMBERS+=("$member")
+    done < <(echo "$MEMBERS_SECTION" | grep -o '"[^"]*"' | tr -d '"')
   else
     # Fallback: Try to find any directory that contains a Cargo.toml file
     echo "Falling back to finding all directories with Cargo.toml..."
@@ -158,6 +159,17 @@ if [ ${#FILTERED_MEMBERS[@]} -eq 0 ]; then
 fi
 
 # Convert to JSON array for matrix - without jq dependency
-JSON_MEMBERS=$(array_to_json "${FILTERED_MEMBERS[@]}")
+# Filter out empty strings first
+VALID_MEMBERS=()
+for pkg in "${FILTERED_MEMBERS[@]}"; do
+  [[ -n "$pkg" ]] && VALID_MEMBERS+=("$pkg")
+done
+
+if [ ${#VALID_MEMBERS[@]} -eq 0 ]; then
+    echo "No valid workspace members found, using rsky-common as fallback"
+    VALID_MEMBERS+=("rsky-common")
+fi
+
+JSON_MEMBERS=$(array_to_json "${VALID_MEMBERS[@]}")
 echo "workspace_members=$JSON_MEMBERS" >> "$GITHUB_OUTPUT"
 echo "Found workspace members to process: $JSON_MEMBERS"
