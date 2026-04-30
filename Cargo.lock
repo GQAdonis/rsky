@@ -1520,13 +1520,12 @@ dependencies = [
 
 [[package]]
 name = "cid"
-version = "0.11.1"
+version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3147d8272e8fa0ccd29ce51194dd98f79ddfb8191ba9e3409884e751798acf3a"
+checksum = "21a304f95f84d169a6f31c4d0a30d784643aaa0bbc9c1e449a2c23e963ec4971"
 dependencies = [
- "core2",
  "multibase",
- "multihash 0.19.3",
+ "multihash 0.19.5",
  "serde",
  "serde_bytes",
  "unsigned-varint 0.8.0",
@@ -1707,7 +1706,7 @@ version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -2248,7 +2247,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d162beedaa69905488a8da94f5ac3edb4dd4788b732fadb7bd120b2625c1976"
 dependencies = [
  "data-encoding",
- "syn 2.0.106",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -4997,7 +4996,7 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "104718b1cc124d92a6d01ca9c9258a7df311405debb3408c445a36452f9bf8db"
 dependencies = [
- "cid 0.11.1",
+ "cid 0.11.3",
  "serde",
  "serde_bytes",
 ]
@@ -5025,7 +5024,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb7f8cd4cb9aa083fba8b52e921764252d0b4dcb1cd6d120b809dbfe1106e81a"
 dependencies = [
  "anyhow",
- "cid 0.11.1",
+ "cid 0.11.3",
  "futures",
  "serde",
  "serde_ipld_dagcbor 0.6.3",
@@ -5042,7 +5041,7 @@ checksum = "e04d7f318608d35d4b61ddd75cbdaee86b023ebe2bd5a66ee0915f0bf93095a9"
 dependencies = [
  "hermit-abi",
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -5929,11 +5928,10 @@ dependencies = [
 
 [[package]]
 name = "multihash"
-version = "0.19.3"
+version = "0.19.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b430e7953c29dd6a09afc29ff0bb69c6e306329ee6794700aee27b76a1aea8d"
+checksum = "577c63b00ad74d57e8c9aa870b5fccebf2fd64a308a5aee9f1bb88e4aea19447"
 dependencies = [
- "core2",
  "serde",
  "unsigned-varint 0.8.0",
 ]
@@ -5978,7 +5976,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f1b7edab35d920890b88643a765fc9bd295cf0201f4154dda231bef9b8404eb"
 dependencies = [
  "core2",
- "multihash 0.19.3",
+ "multihash 0.19.5",
  "multihash-derive-impl",
 ]
 
@@ -7974,10 +7972,10 @@ dependencies = [
  "anyhow",
  "base64ct",
  "chrono",
- "cid 0.11.1",
+ "cid 0.11.3",
  "futures",
  "indexmap 1.9.3",
- "multihash 0.19.3",
+ "multihash 0.19.5",
  "multihash-codetable",
  "rand 0.8.5",
  "rand_core 0.6.4",
@@ -8043,12 +8041,12 @@ dependencies = [
  "anyhow",
  "chrono",
  "ciborium",
- "cid 0.11.1",
+ "cid 0.11.3",
  "derive_builder 0.12.0",
  "dotenvy",
  "futures",
  "miette 5.10.0",
- "multihash 0.19.3",
+ "multihash 0.19.5",
  "parking_lot",
  "reqwest 0.11.27",
  "retry",
@@ -8111,13 +8109,13 @@ dependencies = [
  "atrium-xrpc-client",
  "chrono",
  "ciborium",
- "cid 0.11.1",
+ "cid 0.11.3",
  "derive_builder 0.20.2",
  "dotenvy",
  "futures",
  "ipld-core",
  "miette 7.6.0",
- "multihash 0.19.3",
+ "multihash 0.19.5",
  "parking_lot",
  "reqwest 0.12.23",
  "retry",
@@ -8140,7 +8138,7 @@ version = "0.2.8"
 dependencies = [
  "anyhow",
  "chrono",
- "cid 0.11.1",
+ "cid 0.11.3",
  "derive_builder 0.12.0",
  "miette 5.10.0",
  "parking_lot",
@@ -8177,7 +8175,7 @@ dependencies = [
  "base64-url",
  "base64ct",
  "chrono",
- "cid 0.11.1",
+ "cid 0.11.3",
  "data-encoding",
  "diesel",
  "diesel_migrations",
@@ -8234,7 +8232,7 @@ dependencies = [
  "bytes",
  "chrono",
  "ciborium",
- "cid 0.11.1",
+ "cid 0.11.3",
  "clap",
  "color-eyre",
  "derive_more 2.0.1",
@@ -8290,7 +8288,7 @@ dependencies = [
  "async-recursion",
  "async-stream",
  "async-trait",
- "cid 0.11.1",
+ "cid 0.11.3",
  "futures",
  "glob",
  "indexmap 2.10.0",
@@ -8323,7 +8321,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
- "cid 0.11.1",
+ "cid 0.11.3",
  "dioxus",
  "dioxus-web",
  "getrandom 0.2.16",
@@ -8363,7 +8361,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "chrono",
- "cid 0.11.1",
+ "cid 0.11.3",
  "color-eyre",
  "deadpool-postgres",
  "futures",
@@ -8400,7 +8398,7 @@ dependencies = [
  "bytes",
  "chrono",
  "ciborium",
- "cid 0.11.1",
+ "cid 0.11.3",
  "clap",
  "color-eyre",
  "dashmap 6.1.0",
@@ -8503,7 +8501,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
