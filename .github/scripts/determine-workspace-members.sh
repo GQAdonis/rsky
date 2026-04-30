@@ -65,7 +65,7 @@ fi
 echo "Found workspace members: ${WORKSPACE_MEMBERS[*]}"
 
 # Define packages to skip
-SKIP_PACKAGES=("cypher/frontend" "cypher/backend" "rsky-pdsadmin")
+SKIP_PACKAGES=("cypher/frontend" "cypher/backend" "rsky-pdsadmin" "rsky-appview")
 
 # Check if .github directory has changes
 GITHUB_CHANGES=false
@@ -173,3 +173,14 @@ fi
 JSON_MEMBERS=$(array_to_json "${VALID_MEMBERS[@]}")
 echo "workspace_members=$JSON_MEMBERS" >> "$GITHUB_OUTPUT"
 echo "Found workspace members to process: $JSON_MEMBERS"
+
+# Detect inner workspace changes (rsky-appview has its own Cargo workspace)
+INNER_WS_CHANGES=false
+for pkg in "${CHANGED_MEMBERS[@]}"; do
+    if [[ "$pkg" == "rsky-appview" ]]; then
+        INNER_WS_CHANGES=true
+        break
+    fi
+done
+echo "inner_workspace_changes=$INNER_WS_CHANGES" >> "$GITHUB_OUTPUT"
+echo "Inner workspace (rsky-appview) changes: $INNER_WS_CHANGES"
