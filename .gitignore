@@ -168,6 +168,7 @@ backfill_cache
 rsky-wintermute/*.md
 rsky-wintermute/*.json
 !rsky-wintermute/README.md
+rsky-appview/src/
 .claude
 docs
 # KBD orchestrator and OpenSpec are committed — they are shared coordination files
