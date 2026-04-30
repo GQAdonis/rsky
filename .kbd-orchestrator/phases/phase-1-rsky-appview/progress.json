@@ -1,0 +1,157 @@
+{
+  "phase": "phase-1-rsky-appview",
+  "last_updated": "2026-04-29T00:00:00Z",
+  "last_updated_by": "opencode",
+  "changes": {
+    "c001-workspace": {
+      "status": "DONE",
+      "tasks_total": 3,
+      "tasks_done": 3,
+      "last_task_completed": "Create all crate directories + stubs",
+      "next_task_pending": null,
+      "started_by": "opencode",
+      "completed_by": "opencode",
+      "blockers": []
+    },
+    "c002-appview-core": {
+      "status": "DONE",
+      "tasks_total": 4,
+      "tasks_done": 4,
+      "last_task_completed": "Scaffold appview-core: error, types, traits, config",
+      "next_task_pending": null,
+      "started_by": "opencode",
+      "completed_by": "opencode",
+      "blockers": []
+    },
+    "c003-appview-lexicon": {
+      "status": "DONE",
+      "tasks_total": 5,
+      "tasks_done": 5,
+      "last_task_completed": "Scaffold appview-lexicon: bsky.* + knowme.* types",
+      "next_task_pending": null,
+      "started_by": "opencode",
+      "completed_by": "opencode",
+      "blockers": []
+    },
+    "c004-appview-db": {
+      "status": "DONE",
+      "tasks_total": 4,
+      "tasks_done": 4,
+      "last_task_completed": "sqlx pool, typed query fns for actor/feed/graph/notification/generator",
+      "next_task_pending": null,
+      "started_by": "opencode",
+      "completed_by": "opencode",
+      "blockers": []
+    },
+    "c005-appview-identity": {
+      "status": "DONE",
+      "tasks_total": 3,
+      "tasks_done": 3,
+      "last_task_completed": "DidResolver with Moka cache + HandleResolver",
+      "next_task_pending": null,
+      "started_by": "opencode",
+      "completed_by": "opencode",
+      "blockers": []
+    },
+    "c006-appview-auth": {
+      "status": "DONE",
+      "tasks_total": 3,
+      "tasks_done": 3,
+      "last_task_completed": "decode_token + Viewer/OptionalViewer Axum extractors",
+      "next_task_pending": null,
+      "started_by": "opencode",
+      "completed_by": "opencode",
+      "blockers": []
+    },
+    "c007-appview-queue": {
+      "status": "DONE",
+      "tasks_total": 3,
+      "tasks_done": 3,
+      "last_task_completed": "Fjall IndexQueue: live/backfill partitions, cursor storage, enqueue/dequeue/delete_cursor",
+      "next_task_pending": null,
+      "started_by": "opencode",
+      "completed_by": "opencode",
+      "blockers": []
+    },
+    "c008-appview-firehose": {
+      "status": "DONE",
+      "tasks_total": 3,
+      "tasks_done": 3,
+      "last_task_completed": "FirehoseConsumer: WebSocket, cursor checkpoint, semaphore concurrency, idle timeout, future cursor handling",
+      "next_task_pending": null,
+      "started_by": "opencode",
+      "completed_by": "opencode",
+      "blockers": []
+    },
+    "c009-appview-indexer": {
+      "status": "DONE",
+      "tasks_total": 5,
+      "tasks_done": 5,
+      "last_task_completed": "Indexer skeleton with run_live/run_backfill loops, process_job dispatch, collection routing stubs for all CRUD ops",
+      "next_task_pending": null,
+      "started_by": "opencode",
+      "completed_by": "opencode",
+      "blockers": []
+    },
+    "c010-appview-labels": {
+      "status": "DONE",
+      "tasks_total": 2,
+      "tasks_done": 2,
+      "last_task_completed": "LabelStore with Moka cache + DB load/store + filter_labels + ViewerPrefs",
+      "next_task_pending": null,
+      "started_by": "opencode",
+      "completed_by": "opencode",
+      "blockers": []
+    },
+    "c011-appview-livekit": {
+      "status": "PENDING",
+      "tasks_total": 4,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Scaffold appview-livekit: token mint, RoomService API, billing gate",
+      "started_by": null,
+      "completed_by": null,
+      "blockers": []
+    },
+    "c012-appview-webrtc": {
+      "status": "PENDING",
+      "tasks_total": 4,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Scaffold appview-webrtc: WHIP/WHEP signaling + yrs CRDT session relay",
+      "started_by": null,
+      "completed_by": null,
+      "blockers": []
+    },
+    "c013-appview-api": {
+      "status": "DONE",
+      "tasks_total": 6,
+      "tasks_done": 6,
+      "last_task_completed": "All 27 bsky.* XRPC endpoint handlers implemented: actor(5), feed(10), graph(7), notification(2), unspecced(1)",
+      "next_task_pending": null,
+      "started_by": "opencode",
+      "completed_by": "opencode",
+      "blockers": []
+    },
+    "c014-appview-bin": {
+      "status": "DONE",
+      "tasks_total": 3,
+      "tasks_done": 3,
+      "last_task_completed": "CLI entrypoint with firehose consumer, indexer, and HTTP API server wiring",
+      "next_task_pending": null,
+      "started_by": "opencode",
+      "completed_by": "opencode",
+      "blockers": []
+    },
+    "c015-dockerfile-k8s": {
+      "status": "DONE",
+      "tasks_total": 3,
+      "tasks_done": 3,
+      "last_task_completed": "Dockerfile + k8s manifests (statefulset, service, secret, httproute) + deploy.yml integration",
+      "next_task_pending": null,
+      "started_by": "opencode",
+      "completed_by": "opencode",
+      "blockers": []
+    }
+  }
+}

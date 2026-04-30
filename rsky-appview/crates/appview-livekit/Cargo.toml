@@ -1,0 +1,17 @@
+[package]
+name = "appview-livekit"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+appview-core = { path = "../appview-core" }
+appview-db = { path = "../appview-db" }
+livekit-api = "0.4"
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }

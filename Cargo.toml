@@ -18,6 +18,7 @@ members = [
   "rsky-video",
   "rsky-wintermute",
 ]
+exclude = ["rsky-appview"]
 resolver = "2"
 
 [workspace.dependencies]

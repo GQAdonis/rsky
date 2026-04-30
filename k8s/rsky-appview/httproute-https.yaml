@@ -1,0 +1,26 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: rsky-appview-https
+  namespace: atproto
+spec:
+  parentRefs:
+    - name: appview-gateway
+      sectionName: https
+  hostnames:
+    - appview.know-me.tools
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /xrpc/app.bsky
+      backendRefs:
+        - name: rsky-appview
+          port: 8080
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /xrpc/tools.know-me
+      backendRefs:
+        - name: rsky-appview
+          port: 8080

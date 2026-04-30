@@ -1,0 +1,11 @@
+[package]
+name = "appview-labels"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+appview-core = { path = "../appview-core" }
+appview-db = { path = "../appview-db" }
+sqlx = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }

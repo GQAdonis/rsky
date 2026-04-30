@@ -10,6 +10,7 @@ on:
       - 'rsky-labeler/**'
       - 'rsky-jetstream-subscriber/**'
       - 'rsky-wintermute/**'
+      - 'rsky-appview/**'
       - 'rsky-common/**'
       - 'rsky-lexicon/**'
       - 'rsky-repo/**'
@@ -279,6 +280,50 @@ jobs:
           cache-from: type=gha,scope=rsky-wintermute
           cache-to: type=gha,mode=max,scope=rsky-wintermute
 
+  build-appview:
+    name: Build rsky-appview
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      contains(toJson(github.event.commits), '"rsky-appview/') ||
+      contains(toJson(github.event.head_commit), '"rsky-appview/') ||
+      contains(toJson(github.event.commits), '"rsky-common/') ||
+      contains(toJson(github.event.head_commit), '"rsky-common/') ||
+      contains(toJson(github.event.commits), '"rsky-lexicon/') ||
+      contains(toJson(github.event.head_commit), '"rsky-lexicon/') ||
+      contains(toJson(github.event.commits), '"rsky-repo/') ||
+      contains(toJson(github.event.head_commit), '"rsky-repo/') ||
+      contains(toJson(github.event.commits), '"Cargo.lock"') ||
+      contains(toJson(github.event.head_commit), '"Cargo.lock"')
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/rsky-appview
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: rsky-appview/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=rsky-appview
+          cache-to: type=gha,mode=max,scope=rsky-appview
+
   build-web-client:
     name: Build web-client
     runs-on: ubuntu-latest
@@ -331,6 +376,7 @@ jobs:
       - build-labeler
       - build-jetstream
       - build-wintermute
+      - build-appview
       - build-web-client
     # Run deploy even if some build jobs were skipped (path-filtered)
     if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
@@ -544,6 +590,23 @@ jobs:
           sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-wintermute/statefulset.yaml \
             | kubectl apply -f -
 
+      # ── rsky-appview ──────────────────────────────────────────────────────
+      - name: Apply rsky-appview manifests
+        run: |
+          kubectl apply -f k8s/rsky-appview/service.yaml
+          kubectl apply -f k8s/rsky-appview/httproute-https.yaml
+
+      - name: Deploy rsky-appview StatefulSet
+        run: |
+          IMAGE_TAG="${{ needs.build-appview.outputs.image_tag }}"
+          if [ -z "$IMAGE_TAG" ]; then
+            IMAGE_TAG=$(kubectl get statefulset rsky-appview -n atproto \
+              -o jsonpath='{.spec.template.spec.containers[0].image}' \
+              2>/dev/null | cut -d: -f2 || echo "latest")
+          fi
+          sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-appview/statefulset.yaml \
+            | kubectl apply -f -
+
       # ── web-client ────────────────────────────────────────────────────────
       - name: Apply web-client manifests
         run: |
@@ -579,6 +642,8 @@ jobs:
           kubectl rollout status deployment/rsky-jetstream-subscriber \
             -n atproto --timeout=300s
           kubectl rollout status statefulset/rsky-wintermute \
+            -n atproto --timeout=600s
+          kubectl rollout status statefulset/rsky-appview \
             -n atproto --timeout=600s
           kubectl rollout status deployment/web-client \
             -n atproto --timeout=300s

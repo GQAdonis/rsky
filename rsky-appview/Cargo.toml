@@ -1,0 +1,75 @@
+[workspace]
+members = [
+  "crates/appview-core",
+  "crates/appview-lexicon",
+  "crates/appview-db",
+  "crates/appview-identity",
+  "crates/appview-auth",
+  "crates/appview-queue",
+  "crates/appview-firehose",
+  "crates/appview-indexer",
+  "crates/appview-labels",
+  "crates/appview-api",
+  "crates/appview-livekit",
+  "crates/appview-webrtc",
+  "crates/appview-bin",
+]
+resolver = "2"
+
+[workspace.dependencies]
+# Shared across crates
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+chrono = { version = "0.4", features = ["serde"] }
+axum = { version = "0.8", features = ["json", "query", "http1", "macros"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono", "uuid", "json"] }
+deadpool-postgres = { version = "0.14" }
+tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-serde_json-1", "with-uuid-1"] }
+moka = { version = "0.12", features = ["future"] }
+fjall = "2"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls-webpki-roots-no-provider"] }
+jsonwebtoken = "9"
+base64 = { version = "0.22", features = ["std"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+async-trait = "0.1"
+clap = { version = "4", features = ["derive", "env"] }
+dotenvy = "0.15"
+mimalloc = "0.1"
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs"] }
+rand = "0.8"
+url = "2"
+ciborium = "0.2"
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
+bincode = "1"
+futures = "0.3"
+metrics = "0.24"
+metrics-exporter-prometheus = "0.16"
+
+# Parent workspace crates
+rsky-identity = { path = "../rsky-identity" }
+rsky-crypto = { path = "../rsky-crypto" }
+rsky-syntax = { path = "../rsky-syntax" }
+rsky-common = { path = "../rsky-common" }
+rsky-lexicon = { path = "../rsky-lexicon" }
+rsky-repo = { path = "../rsky-repo" }
+rsky-firehose = { path = "../rsky-firehose" }
+
+# Internal crates
+appview-core = { path = "crates/appview-core" }
+appview-lexicon = { path = "crates/appview-lexicon" }
+appview-db = { path = "crates/appview-db" }
+appview-identity = { path = "crates/appview-identity" }
+appview-auth = { path = "crates/appview-auth" }
+appview-queue = { path = "crates/appview-queue" }
+appview-firehose = { path = "crates/appview-firehose" }
+appview-indexer = { path = "crates/appview-indexer" }
+appview-labels = { path = "crates/appview-labels" }
+appview-api = { path = "crates/appview-api" }
+appview-livekit = { path = "crates/appview-livekit" }
+appview-webrtc = { path = "crates/appview-webrtc" }

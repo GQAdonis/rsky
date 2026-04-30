@@ -1,0 +1,23 @@
+[package]
+name = "appview-api"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+appview-auth = { path = "../appview-auth" }
+appview-core = { path = "../appview-core" }
+appview-db = { path = "../appview-db" }
+appview-identity = { path = "../appview-identity" }
+appview-labels = { path = "../appview-labels" }
+appview-lexicon = { path = "../appview-lexicon" }
+appview-livekit = { path = "../appview-livekit" }
+appview-queue = { path = "../appview-queue" }
+axum = { workspace = true }
+sqlx = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }

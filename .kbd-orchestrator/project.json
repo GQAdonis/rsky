@@ -1,126 +1,18 @@
 {
-  "name": "social.know-me.tools ATProto Stack",
-  "description": "Full Rust AT Protocol stack (rsky) deployed to GKE under social.know-me.tools — PDS, Relay, AppView, FeedGen, Labeler, and web client with ArgoCD, Envoy Gateway, and Let's Encrypt.",
-  "active_phase": "phase-2-commit-and-deploy",
-  "focus_project_path": "/Users/gqadonis/Projects/travisjames/rsky",
-  "spec_paths": [
-    "openspec/specs/*.md"
-  ],
-  "openspec_available": true,
-  "change_backend": "openspec",
-  "constraint_file": ".kbd-orchestrator/constraints.md",
-  "build_health_command": "cargo check --workspace",
-  "test_command": "cargo test --workspace",
-  "lint_command": "cargo fmt -- --check",
-  "dev_command": null,
-  "preferred_planning_agent": "antigravity",
-  "preferred_execution_agents": ["claude-code", "cursor", "codex", "opencode"],
-  "agents_config": {
-    "claude-code": {
-      "entry": "claude CLI",
-      "best_for": "large architectural changes, k8s manifests, multi-file Rust"
-    },
-    "cursor": {
-      "entry": "Cursor Agent mode",
-      "best_for": "multi-file refactoring, parallel subagent tasks"
-    },
-    "codex": {
-      "entry": "OpenAI Codex app or CLI",
-      "best_for": "parallel isolated tasks via git worktrees"
-    },
-    "antigravity": {
-      "entry": "SKILL.md slash commands",
-      "best_for": "complex multi-file features, planning, browser verification"
-    },
-    "opencode": {
-      "entry": "OpenCode CLI/extension",
-      "best_for": "quick targeted edits and file patches"
-    }
-  },
-  "stack": {
-    "language": "Rust",
-    "edition": "2021/2024",
-    "toolchain": "1.86",
-    "workspace_members": [
-      "rsky-pds",
-      "rsky-relay",
-      "rsky-feedgen",
-      "rsky-labeler",
-      "rsky-jetstream-subscriber",
-      "rsky-wintermute",
-      "rsky-firehose",
-      "rsky-satnav",
-      "rsky-video",
-      "rsky-pdsadmin",
-      "rsky-crypto",
-      "rsky-identity",
-      "rsky-lexicon",
-      "rsky-common",
-      "rsky-repo",
-      "rsky-syntax",
-      "palomar-sync"
-    ],
-    "services_with_dockerfiles": [
-      "rsky-pds",
-      "rsky-feedgen",
-      "rsky-labeler",
-      "rsky-jetstream-subscriber",
-      "rsky-firehose"
-    ],
-    "docker_registry": "ghcr.io/know-me-tools",
-    "docker_registry_upstream": "ghcr.io/blacksky-algorithms"
-  },
-  "infrastructure": {
-    "cluster": "client-cluster",
-    "region": "us-central1",
-    "provider": "GKE",
-    "gateway_class": "eg",
-    "cert_issuer": "letsencrypt",
-    "cert_issuer_kind": "ClusterIssuer",
-    "argocd": true,
-    "namespace": "atproto",
-    "domain": "social.know-me.tools",
-    "related_domains": [
-      "pds.know-me.tools",
-      "relay.know-me.tools",
-      "feed.know-me.tools"
-    ],
-    "k8s_pattern_reference": "../conduit/k8s",
-    "deploy_workflow_reference": "../conduit/.github/workflows/deploy.yaml"
-  },
-  "related_repos": {
-    "librefang": "https://github.com/GQAdonis/librefang",
-    "universal_agent_runtime": "https://github.com/Prometheus-AGS/universal-agent-runtime",
-    "conduit_deployment": "../conduit"
-  },
-  "workspace": {
-    "workspace_file": null,
-    "folders": [
-      {
-        "path": "/Users/gqadonis/Projects/travisjames/rsky",
-        "role": "focus",
-        "write_access": true
-      },
-      {
-        "path": "/Users/gqadonis/Projects/travisjames/conduit",
-        "role": "reference",
-        "write_access": false,
-        "purpose": "Reference k8s manifest and GitHub Actions deploy patterns (Envoy Gateway, cert-manager, GHCR)",
-        "read_paths": [
-          "k8s/**/*.yaml",
-          ".github/workflows/deploy.yaml"
-        ]
-      }
-    ]
-  },
-  "model_policy": {
-    "kbd-assess": "frontier",
-    "kbd-plan": "frontier",
-    "kbd-status": "small",
-    "kbd-reflect": "frontier",
-    "opsx-new": "small",
-    "opsx-apply": "tiered",
-    "opsx-verify": "medium",
-    "opsx-archive": "small"
+  "project_name": "rsky",
+  "description": "Rust AT Protocol stack for the Know Me network — PDS, relay, AppView, feedgen, and web client",
+  "stack": ["rust", "axum", "tokio", "sqlx", "postgresql", "nextjs", "typescript", "kubernetes"],
+  "workspace_root": "/Users/gqadonis/Projects/travisjames/rsky",
+  "active_phase": "phase-2-appview-functional",
+  "phases_dir": ".kbd-orchestrator/phases",
+  "constraints_file": ".kbd-orchestrator/constraints.md",
+  "spec_dir": "openspec/specs",
+  "toolchain": {
+    "rust": "1.86",
+    "edition": "2024",
+    "fmt": "cargo fmt",
+    "check": "cargo check -p rsky-appview",
+    "build": "cargo build --release -p rsky-appview",
+    "test": "cargo test --release -p rsky-appview"
   }
 }

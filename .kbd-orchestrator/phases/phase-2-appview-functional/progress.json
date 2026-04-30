@@ -1,0 +1,67 @@
+{
+  "phase": "phase-2-appview-functional",
+  "last_updated": "2026-04-29T00:00:00Z",
+  "last_updated_by": "opencode",
+  "changes": {
+    "c016-indexer-crud": {
+      "status": "PENDING",
+      "tasks_total": 11,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Implement create_record — parse CAR block, validate NSID, dispatch to collection handler",
+      "started_by": null,
+      "completed_by": null,
+      "blockers": []
+    },
+    "c017-auth-viewer": {
+      "status": "PENDING",
+      "tasks_total": 6,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Change get_blocks/get_mutes to accept OptionalViewer and filter by viewer_did",
+      "started_by": null,
+      "completed_by": null,
+      "blockers": []
+    },
+    "c018-integration-tests": {
+      "status": "PENDING",
+      "tasks_total": 7,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Create test database setup helper with migrations + seed data",
+      "started_by": null,
+      "completed_by": null,
+      "blockers": []
+    },
+    "c019-prometheus-metrics": {
+      "status": "PENDING",
+      "tasks_total": 7,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Add metrics route on port 9090 with prometheus registry",
+      "started_by": null,
+      "completed_by": null,
+      "blockers": []
+    },
+    "c020-livekit-token": {
+      "status": "PENDING",
+      "tasks_total": 6,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Scaffold POST /xrpc/tools.know-me.live.tokenMint endpoint",
+      "started_by": null,
+      "completed_by": null,
+      "blockers": []
+    },
+    "c021-webrtc-signaling": {
+      "status": "PENDING",
+      "tasks_total": 4,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Implement POST /xrpc/tools.know-me.video.whip endpoint",
+      "started_by": null,
+      "completed_by": null,
+      "blockers": []
+    }
+  }
+}

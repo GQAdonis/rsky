@@ -1,0 +1,13 @@
+[package]
+name = "appview-identity"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+appview-core = { workspace = true }
+rsky-identity = { workspace = true }
+moka = { version = "0.12", features = ["future"] }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }

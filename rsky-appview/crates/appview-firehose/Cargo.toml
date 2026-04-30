@@ -1,0 +1,20 @@
+[package]
+name = "appview-firehose"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+appview-core = { path = "../appview-core" }
+appview-queue = { path = "../appview-queue" }
+rsky-firehose = { path = "../../../rsky-firehose" }
+rsky-lexicon = { path = "../../../rsky-lexicon" }
+rsky-repo = { path = "../../../rsky-repo" }
+lexicon_cid = { version = "0.11.1", package = "cid", features = ["serde-codec"] }
+tokio = { workspace = true }
+tokio-tungstenite = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+futures = { workspace = true }
+url = "2.5"
+anyhow = "1.0"

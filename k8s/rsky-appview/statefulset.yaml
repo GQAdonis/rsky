@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rsky-appview
+  namespace: atproto
+  labels:
+    app: rsky-appview
+spec:
+  serviceName: rsky-appview
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rsky-appview
+  template:
+    metadata:
+      labels:
+        app: rsky-appview
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: rsky-appview
+          image: ghcr.io/know-me-tools/rsky-appview:IMAGE_TAG
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: rsky-appview-secrets
+          env:
+            - name: RUST_LOG
+              value: "info"
+          livenessProbe:
+            httpGet:
+              path: /xrpc/_health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /xrpc/_health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "500m"
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 8Gi
+          volumeMounts:
+            - name: rsky-appview-data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: rsky-appview-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: atproto-ssd-immediate
+        resources:
+          requests:
+            storage: 100Gi

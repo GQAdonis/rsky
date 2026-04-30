@@ -1,4 +1,5 @@
 /target/
+**/target/
 **/*.rs.bk
 .openapi-generator-ignore
 .openapi-generator
@@ -170,4 +171,9 @@ rsky-wintermute/*.json
 .claude
 docs
 # KBD orchestrator and OpenSpec are committed — they are shared coordination files
-# .kbd-orchestrator and openspec are NOT excluded
+# .kbd-orchestrator and openspec are NOT excludedtarget/
+.codex/
+.cursor/
+.opencode/
+.windsurf/
+.claude/

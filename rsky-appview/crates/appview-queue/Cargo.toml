@@ -1,0 +1,12 @@
+[package]
+name = "appview-queue"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+appview-core = { path = "../appview-core" }
+bincode = { workspace = true }
+chrono = { workspace = true }
+fjall = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
