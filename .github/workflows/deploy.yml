@@ -332,7 +332,9 @@ jobs:
       contains(toJson(github.event.commits), '"web-client/') ||
       contains(toJson(github.event.head_commit), '"web-client/') ||
       contains(toJson(github.event.commits), '"Dockerfile.web-client"') ||
-      contains(toJson(github.event.head_commit), '"Dockerfile.web-client"')
+      contains(toJson(github.event.head_commit), '"Dockerfile.web-client"') ||
+      contains(toJson(github.event.commits), '".github/workflows/deploy.yml"') ||
+      contains(toJson(github.event.head_commit), '".github/workflows/deploy.yml"')
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
     steps:
