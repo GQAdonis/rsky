@@ -53,8 +53,9 @@
   "did_subsystem_integration": "DONE",
   "did_subsystem_integration_commit": "f1be504",
   "did_subsystem_integration_notes": "SharedCompositeResolver { resolver: CompositeDidResolver } added to rsky-pds managed state (lib.rs build_rocket). verify_agent_service_jwt accepts &CompositeDidResolver instead of plc_url string; AgentAuth::from_request extracts &State<SharedCompositeResolver>. Eliminates per-request with_all_methods() allocation.",
-  "next_skill": "kbd-reflect",
-  "next_command": "/kbd-reflect phase-3-pds-feature-parity",
+  "next_skill": "kbd-new-phase",
+  "next_command": "/kbd-new-phase phase-4-pds-hardening",
+  "reflection_complete": true,
   "open_gaps": [],
-  "notes": "All 12 parity changes complete as of 2026-05-01. G1 (lexicon refresh 9cd28fc), G2+G3 (auth_verifier OAuth token discriminator + pipethrough scope gate 3d786ba), G4 (requestCrawl coalesce 3d786ba). cargo check -p rsky-pds clean. Remaining: live verification against relay (sync v1.1 soak) and OAuth end-to-end with Bluesky web client."
+  "notes": "Phase reflected 2026-05-01. 15/17 goals MET, 2 PARTIAL (sync v1.1 live verification pending, RLS permissive-only). Recommended phase-4 focus: DPoP binding, RLS tighten, CI conformance harness, dedicated OAuth key pair, background jobs sweep."
 }

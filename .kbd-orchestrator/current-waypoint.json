@@ -1,13 +1,36 @@
 {
-  "active_phase": "phase-3-pds-feature-parity",
-  "phase_status": "COMPLETE",
+  "active_phase": "phase-4-pds-hardening",
+  "phase_status": "NOT_STARTED",
   "backend": "opencode",
-  "last_completed_change": "p3-c012",
+  "last_completed_phase": "phase-3-pds-feature-parity",
+  "last_completed_change": null,
   "next_pending_change": null,
-  "next_pending_note": "All 12 changes done. Phase ready for live verification.",
+  "next_pending_note": "Phase 4 not yet planned. Run /kbd-assess phase-4-pds-hardening to begin.",
   "last_updated_by": "opencode",
   "last_updated": "2026-05-01T00:00:00Z",
-  "preferred_re_entry_skill": "kbd-reflect",
-  "exact_next_command": "/kbd-reflect phase-3-pds-feature-parity",
-  "fallback_command": "/kbd-status"
+  "preferred_re_entry_skill": "kbd-assess",
+  "exact_next_command": "/kbd-assess phase-4-pds-hardening",
+  "fallback_command": "/kbd-status",
+  "phase_4_seed": {
+    "source": "phase-3-reflection",
+    "high_priority": [
+      "DPoP binding enforcement (cnf.jkt validation in auth_verifier OAuth path)",
+      "Actor store RLS tighten: wire SET LOCAL app.current_did at call sites, change to RESTRICTIVE policies",
+      "Conformance harness CI integration (GitHub Actions job for run-conformance.sh)"
+    ],
+    "medium_priority": [
+      "Dedicated OAuth signing key pair (separate from session JWT key)",
+      "Background jobs sweep: token cleanup, email-token GC, blob GC",
+      "Mailer template parity audit (15 templates vs upstream)"
+    ],
+    "low_priority": [
+      "rsky-lexicon codegen evaluation",
+      "Fix unused Redirect import in oauth/authorize.rs"
+    ],
+    "live_verification_prerequisites": [
+      "Relay soak test (sync v1.1 strict relay, 24h)",
+      "OAuth end-to-end with Bluesky web client against pds.know-me.tools",
+      "Conformance harness CAR byte equivalence run"
+    ]
+  }
 }
