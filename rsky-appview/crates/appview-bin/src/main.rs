@@ -40,19 +40,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Firehose consumer — relay hosts from RELAY_HOSTS env var (comma-separated WSS URLs)
     // Falls back to the public Bluesky relay if not set.
+    // The FirehoseConsumer normalizes the URL (strips wss:// prefix, appends XRPC path).
     let relay_hosts: Vec<String> = std::env::var("RELAY_HOSTS")
         .unwrap_or_else(|_| "wss://bsky.network".to_string())
         .split(',')
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
-        .map(|host| {
-            // Ensure the full XRPC path is appended if not already present
-            if host.contains("/xrpc/") {
-                host
-            } else {
-                format!("{}/xrpc/com.atproto.sync.subscribeRepos", host.trim_end_matches('/'))
-            }
-        })
         .collect();
 
     info!("Connecting to relay hosts: {:?}", relay_hosts);

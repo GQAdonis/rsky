@@ -110,13 +110,21 @@ impl FirehoseConsumer {
         let last_seq = Arc::new(AtomicI64::new(cursor.unwrap_or(0)));
 
         let clean_hostname = hostname
+            .trim_start_matches("wss://")
+            .trim_start_matches("ws://")
             .trim_start_matches("https://")
             .trim_start_matches("http://")
             .trim_end_matches('/');
 
-        let mut url = match url::Url::parse(&format!(
-            "wss://{clean_hostname}/xrpc/com.atproto.sync.subscribeRepos"
-        )) {
+        // If the caller already provided the full XRPC path, use it directly;
+        // otherwise append the subscribeRepos path.
+        let full_url = if clean_hostname.contains("/xrpc/") {
+            format!("wss://{clean_hostname}")
+        } else {
+            format!("wss://{clean_hostname}/xrpc/com.atproto.sync.subscribeRepos")
+        };
+
+        let mut url = match url::Url::parse(&full_url) {
             Ok(u) => u,
             Err(e) => {
                 return ConnectionResult::Timeout;
