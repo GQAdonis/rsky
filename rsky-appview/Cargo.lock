@@ -109,6 +109,7 @@ dependencies = [
  "axum",
  "metrics",
  "metrics-exporter-prometheus",
+ "rustls 0.23.31",
  "tokio",
  "tower",
  "tower-http",
