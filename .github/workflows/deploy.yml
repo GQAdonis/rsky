@@ -441,6 +441,7 @@ jobs:
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
           WINTERMUTE_RELAY_HOSTS: ${{ secrets.WINTERMUTE_RELAY_HOSTS }}
+          APPVIEW_RELAY_HOSTS: ${{ secrets.APPVIEW_RELAY_HOSTS }}
         run: |
           envsubst < k8s/postgresql/secret.yaml              | kubectl apply -f -
           envsubst < k8s/rsky-pds/secret.yaml                | kubectl apply -f -
@@ -449,6 +450,7 @@ jobs:
           envsubst < k8s/rsky-labeler/secret.yaml            | kubectl apply -f -
           envsubst < k8s/rsky-jetstream-subscriber/secret.yaml | kubectl apply -f -
           envsubst < k8s/rsky-wintermute/secret.yaml         | kubectl apply -f -
+          envsubst < k8s/rsky-appview/secret.yaml            | kubectl apply -f -
           envsubst < k8s/web-client/secret.yaml              | kubectl apply -f -
 
       # ── PostgreSQL ────────────────────────────────────────────────────────
