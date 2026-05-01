@@ -65,4 +65,4 @@ spec:
         storageClassName: atproto-ssd-immediate
         resources:
           requests:
-            storage: 200Gi
+            storage: 100Gi
