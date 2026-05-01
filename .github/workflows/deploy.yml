@@ -571,8 +571,12 @@ jobs:
       # ── rsky-appview ──────────────────────────────────────────────────────
       - name: Apply rsky-appview manifests
         run: |
+          kubectl apply -f k8s/clusterissuer.yaml
           kubectl apply -f k8s/rsky-appview/service.yaml
+          kubectl apply -f k8s/rsky-appview/gateway.yaml
+          kubectl apply -f k8s/rsky-appview/certificate.yaml
           kubectl apply -f k8s/rsky-appview/httproute-https.yaml
+          kubectl apply -f k8s/rsky-appview/httproute-redirect.yaml
 
       - name: Deploy rsky-appview StatefulSet
         run: |

@@ -13,14 +13,7 @@ spec:
     - matches:
         - path:
             type: PathPrefix
-            value: /xrpc/app.bsky
-      backendRefs:
-        - name: rsky-appview
-          port: 8080
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /xrpc/tools.know-me
+            value: /
       backendRefs:
         - name: rsky-appview
           port: 8080

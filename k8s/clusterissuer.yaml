@@ -1,0 +1,91 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt
+spec:
+  acme:
+    email: travis@know-me.tools
+    privateKeySecretRef:
+      name: letsencrypt-account-key
+    server: https://acme-v02.api.letsencrypt.org/directory
+    solvers:
+    - http01:
+        gatewayHTTPRoute:
+          parentRefs:
+          - group: gateway.networking.k8s.io
+            kind: Gateway
+            name: matrix-gateway
+            namespace: matrix
+      selector:
+        dnsNames:
+        - matrix.know-me.tools
+    - http01:
+        gatewayHTTPRoute:
+          parentRefs:
+          - group: gateway.networking.k8s.io
+            kind: Gateway
+            name: cinny-gateway
+            namespace: matrix
+      selector:
+        dnsNames:
+        - chat.know-me.tools
+    - http01:
+        gatewayHTTPRoute:
+          parentRefs:
+          - group: gateway.networking.k8s.io
+            kind: Gateway
+            name: livekit-gateway
+            namespace: matrix
+      selector:
+        dnsNames:
+        - livekit.know-me.tools
+    - http01:
+        gatewayHTTPRoute:
+          parentRefs:
+          - group: gateway.networking.k8s.io
+            kind: Gateway
+            name: pds-gateway
+            namespace: atproto
+      selector:
+        dnsNames:
+        - pds.know-me.tools
+    - http01:
+        gatewayHTTPRoute:
+          parentRefs:
+          - group: gateway.networking.k8s.io
+            kind: Gateway
+            name: relay-gateway
+            namespace: atproto
+      selector:
+        dnsNames:
+        - relay.know-me.tools
+    - http01:
+        gatewayHTTPRoute:
+          parentRefs:
+          - group: gateway.networking.k8s.io
+            kind: Gateway
+            name: feedgen-gateway
+            namespace: atproto
+      selector:
+        dnsNames:
+        - feed.know-me.tools
+    - http01:
+        gatewayHTTPRoute:
+          parentRefs:
+          - group: gateway.networking.k8s.io
+            kind: Gateway
+            name: web-client-gateway
+            namespace: atproto
+      selector:
+        dnsNames:
+        - social.know-me.tools
+    - http01:
+        gatewayHTTPRoute:
+          parentRefs:
+          - group: gateway.networking.k8s.io
+            kind: Gateway
+            name: appview-gateway
+            namespace: atproto
+      selector:
+        dnsNames:
+        - appview.know-me.tools
