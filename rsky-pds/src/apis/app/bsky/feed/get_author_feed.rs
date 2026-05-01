@@ -160,6 +160,9 @@ pub fn get_author_munge(
                             indexed_at,
                             viewer,
                             labels,
+                            quote_count: _,
+                            bookmark_count: _,
+                            threadgate_record: _,
                         } = post;
                         FeedViewPost {
                             reply,
@@ -178,6 +181,9 @@ pub fn get_author_munge(
                                 indexed_at,
                                 viewer,
                                 labels,
+                                quote_count: None,
+                                bookmark_count: None,
+                                threadgate_record: None,
                             },
                         }
                     } else {

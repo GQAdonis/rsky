@@ -279,6 +279,7 @@ pub fn insert_into_thread_replies<'a>(
                             post,
                             parent,
                             replies,
+                            feed_context: _,
                         } = view;
                         let mut view_replies = replies.unwrap_or(vec![]);
                         let mut replies =
@@ -288,6 +289,7 @@ pub fn insert_into_thread_replies<'a>(
                             post,
                             parent,
                             replies: Some(replies),
+                            feed_context: None,
                         })
                     }
                 };
@@ -298,12 +300,14 @@ pub fn insert_into_thread_replies<'a>(
             post,
             parent,
             replies,
+            feed_context: _,
         } = view;
         match replies {
             None => Ok(ThreadViewPost {
                 post,
                 parent,
                 replies,
+                feed_context: None,
             }),
             Some(ref view_replies) => {
                 let replies = stream::iter(view_replies)
@@ -332,6 +336,7 @@ pub fn insert_into_thread_replies<'a>(
                     post,
                     parent,
                     replies: Some(replies),
+                    feed_context: None,
                 })
             }
         }
@@ -348,6 +353,7 @@ pub async fn thread_post_view(
             post: post_view,
             parent: None,
             replies: None,
+            feed_context: None,
         })),
     }
 }

@@ -43,6 +43,7 @@ rsky-syntax = {path = "rsky-syntax", version = "0.1.0"}
 rsky-common = {path = "rsky-common", version = "0.1.2"}
 rsky-repo = {path = "rsky-repo", version = "0.0.2"}
 rsky-firehose = {path = "rsky-firehose", version = "0.2.1"}
+rsky-oauth-scopes = {path = "rsky-oauth-scopes", version = "0.1.0"}
 
 [profile.release]
 debug = 0

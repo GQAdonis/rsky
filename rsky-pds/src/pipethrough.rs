@@ -12,6 +12,7 @@ use rocket::http::{Method, Status};
 use rocket::request::{FromRequest, Outcome, Request};
 use rocket::{Data, State};
 use rsky_common::{get_service_endpoint, GetServiceEndpointOpts};
+use rsky_oauth_scopes::{scope_permits_xrpc, ScopeSet};
 use rsky_repo::types::Ids;
 use serde::de::DeserializeOwned;
 use serde_json::Value as JsonValue;
@@ -54,10 +55,40 @@ impl<'r> FromRequest<'r> for HandlerPipeThrough {
         match AccessStandard::from_request(req).await {
             Outcome::Success(output) => {
                 let AccessOutput { credentials, .. } = output.access;
-                let requester: Option<String> = match credentials {
-                    None => None,
-                    Some(credentials) => credentials.did,
-                };
+                let (requester, oauth_scope_str): (Option<String>, Option<String>) =
+                    match credentials {
+                        None => (None, None),
+                        Some(ref creds) => (creds.did.clone(), creds.oauth_scope.clone()),
+                    };
+
+                // OAuth scope gate — if the token carries an explicit scope claim,
+                // verify the requested NSID is permitted before forwarding.
+                if let Some(ref scope_str) = oauth_scope_str {
+                    // Derive the NSID from the request path.
+                    // XRPC paths are /xrpc/<nsid>
+                    let path = req.uri().path().to_string();
+                    let nsid = path
+                        .strip_prefix("/xrpc/")
+                        .unwrap_or("")
+                        .split('?')
+                        .next()
+                        .unwrap_or("");
+                    let scope_set: ScopeSet = scope_str.parse().unwrap_or_else(|_| ScopeSet::new());
+                    if !nsid.is_empty() && !scope_permits_xrpc(&scope_set, nsid) {
+                        req.local_cache(|| {
+                            Some(ApiError::InvalidRequest(format!(
+                                "OAuth token scope does not permit {nsid}"
+                            )))
+                        });
+                        return Outcome::Error((
+                            Status::Unauthorized,
+                            anyhow::anyhow!(
+                                "InsufficientScope: OAuth token scope does not permit {nsid}"
+                            ),
+                        ));
+                    }
+                }
+
                 let headers = req.headers().clone().into_iter().fold(
                     BTreeMap::new(),
                     |mut acc: BTreeMap<String, String>, cur| {

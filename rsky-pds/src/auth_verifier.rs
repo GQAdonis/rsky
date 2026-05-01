@@ -5,7 +5,10 @@ use crate::apis::ApiError;
 use crate::xrpc_server::auth::{verify_jwt as verify_service_jwt_server, ServiceJwtPayload};
 use crate::{SharedCompositeResolver, SharedIdResolver};
 use anyhow::{bail, Result};
-use base64::{engine::general_purpose::STANDARD as base64pad, Engine as _};
+use base64::{
+    engine::general_purpose::{STANDARD as base64pad, URL_SAFE as base64url},
+    Engine as _,
+};
 use jwt_simple::claims::Audiences;
 use jwt_simple::prelude::*;
 use rocket::http::Status;
@@ -76,6 +79,10 @@ pub struct Credentials {
     pub r#type: String,
     pub did: Option<String>,
     pub scope: Option<AuthScope>,
+    /// Raw OAuth scope string (space-separated) for tokens issued by the OAuth provider.
+    /// `None` for legacy session JWTs. When set, per-method scope checks use
+    /// `rsky_oauth_scopes::scope_permits_xrpc` rather than the coarse `AuthScope` enum.
+    pub oauth_scope: Option<String>,
     pub audience: Option<String>,
     pub token_id: Option<String>,
     pub aud: Option<String>,
@@ -199,6 +206,7 @@ impl<'r> FromRequest<'r> for Refresh {
                     r#type: "refresh".to_string(),
                     did: Some(did),
                     scope: Some(scope),
+                    oauth_scope: None,
                     audience,
                     token_id: payload.jti,
                     aud: None,
@@ -486,6 +494,7 @@ impl<'r> FromRequest<'r> for UserDidAuth {
                         r#type: "user_did".to_string(),
                         did: None,
                         scope: None,
+                        oauth_scope: None,
                         audience: None,
                         token_id: None,
                         aud: Some(payload.aud),
@@ -574,6 +583,7 @@ impl<'r> FromRequest<'r> for ModService {
                             r#type: "mod_service".to_string(),
                             did: None,
                             scope: None,
+                            oauth_scope: None,
                             audience: None,
                             token_id: None,
                             aud: Some(payload.aud),
@@ -668,6 +678,7 @@ impl<'r> FromRequest<'r> for AdminToken {
                                 r#type: "admin_token".to_string(),
                                 did: None,
                                 scope: None,
+                                oauth_scope: None,
                                 audience: None,
                                 token_id: None,
                                 aud: None,
@@ -742,6 +753,7 @@ pub async fn validate_bearer_access_token<'r>(
             r#type: "access".to_string(),
             did: Some(did),
             scope: Some(scope),
+            oauth_scope: None,
             audience,
             token_id: None,
             aud: None,
@@ -800,6 +812,96 @@ pub async fn validate_access_token<'r>(
     scopes: Vec<AuthScope>,
     opts: Option<ValidateAccessTokenOpts>,
 ) -> Result<AccessOutput> {
+    // --- Token-type discriminator ---
+    // OAuth access tokens issued by rsky-pds (p3-c009) carry a `client_id` claim
+    // that is absent from legacy session JWTs.  We detect this by doing a cheap
+    // base64url decode of the payload section before full verification so we can
+    // branch without re-implementing the signature check.
+    let raw_token = bearer_token_from_req(request)?;
+    if let Some(ref tok) = raw_token {
+        if let Some(oauth_scope_str) = try_extract_oauth_scope(tok) {
+            // OAuth path: validate signature with the same key as legacy JWTs
+            // (our OAuth tokens are signed with PDS_JWT_KEYPAIR in p3-c009).
+            let mut options = VerificationOptions::default();
+            options.allowed_audiences = Some(HashSet::from_strings(&[
+                env::var("PDS_SERVICE_DID").unwrap()
+            ]));
+            match PDS_JWT_KEYPAIR
+                .public_key()
+                .verify_token::<serde_json::Value>(tok, Some(options))
+            {
+                Err(_) => bail!("OAuthTokenInvalid: invalid OAuth access token signature"),
+                Ok(claims) => {
+                    let did = match claims.subject {
+                        Some(sub) => sub,
+                        None => bail!("OAuthTokenInvalid: missing sub claim"),
+                    };
+                    let ValidateAccessTokenOpts {
+                        check_takedown,
+                        check_deactivated,
+                    } = opts.unwrap_or_else(|| ValidateAccessTokenOpts {
+                        check_takedown: Some(false),
+                        check_deactivated: Some(false),
+                    });
+                    let check_takedown = check_takedown.unwrap_or(false);
+                    let check_deactivated = check_deactivated.unwrap_or(false);
+                    if check_takedown || check_deactivated {
+                        let account_manager = match request.guard::<AccountManager>().await {
+                            Outcome::Success(am) => am,
+                            _ => {
+                                return Err(anyhow::Error::new(AuthError::InternalServerError(
+                                    "Unexpected Error Occurred".to_string(),
+                                )))
+                            }
+                        };
+                        let found: ActorAccount = match account_manager
+                            .get_account(
+                                &did,
+                                Some(AvailabilityFlags {
+                                    include_deactivated: Some(true),
+                                    include_taken_down: Some(true),
+                                }),
+                            )
+                            .await
+                        {
+                            Ok(Some(found)) => found,
+                            _ => {
+                                return Err(anyhow::Error::new(AuthError::AccountNotFound(
+                                    "Account not found".to_string(),
+                                )))
+                            }
+                        };
+                        if check_takedown && found.takedown_ref.is_some() {
+                            return Err(anyhow::Error::new(AuthError::AccountTakedown(
+                                "Account has been taken down".to_string(),
+                            )));
+                        }
+                        if check_deactivated && found.deactivated_at.is_some() {
+                            return Err(anyhow::Error::new(AuthError::AccountDeactivated(
+                                "Account is deactivated".to_string(),
+                            )));
+                        }
+                    }
+                    return Ok(AccessOutput {
+                        credentials: Some(Credentials {
+                            r#type: "access".to_string(),
+                            did: Some(did),
+                            scope: Some(AuthScope::Access),
+                            oauth_scope: Some(oauth_scope_str),
+                            audience: None,
+                            token_id: claims.jwt_id,
+                            aud: None,
+                            iss: None,
+                            is_privileged: None,
+                        }),
+                        artifacts: Some(tok.clone()),
+                    });
+                }
+            }
+        }
+    }
+
+    // --- Legacy session JWT path ---
     let mut options = VerificationOptions::default();
     options.allowed_audiences = Some(HashSet::from_strings(&[
         env::var("PDS_SERVICE_DID").unwrap()
@@ -872,6 +974,7 @@ pub async fn validate_access_token<'r>(
             r#type: "access".to_string(),
             did: Some(did),
             scope: Some(scope),
+            oauth_scope: None,
             audience,
             token_id: None,
             aud: None,
@@ -958,6 +1061,28 @@ pub fn is_basic_token(request: &Request) -> bool {
         None => false,
         Some(auth_header) => auth_header.starts_with(BASIC),
     }
+}
+
+/// Cheaply detect whether a JWT is an OAuth access token (vs. a legacy session JWT)
+/// by base64url-decoding its payload section and looking for a `client_id` claim.
+/// OAuth tokens issued by rsky-pds (p3-c009) always carry `client_id`; legacy JWTs
+/// do not.  Returns the raw scope string from the OAuth token, or `None` if not OAuth.
+pub fn try_extract_oauth_scope(jwt: &str) -> Option<String> {
+    let parts: Vec<&str> = jwt.splitn(3, '.').collect();
+    let payload_b64 = parts.get(1)?;
+    // base64url without padding
+    let padding = match payload_b64.len() % 4 {
+        0 => 0,
+        n => 4 - n,
+    };
+    let padded = format!("{}{}", payload_b64, "=".repeat(padding));
+    let bytes = base64url.decode(&padded).ok()?;
+    let json: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+    // Must have `client_id` to be considered an OAuth token
+    json.get("client_id")?;
+    // Extract the `scope` claim (space-separated string)
+    let scope = json.get("scope")?.as_str()?.to_string();
+    Some(scope)
 }
 
 pub fn bearer_token_from_req(request: &Request) -> Result<Option<String>> {

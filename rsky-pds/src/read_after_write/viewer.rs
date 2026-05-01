@@ -219,6 +219,10 @@ impl LocalViewer {
                     viewer: None,
                     labels: None,
                     created_at: None,
+                    pronouns: None,
+                    verification: None,
+                    status: None,
+                    debug: None,
                 }))
             }
         }
@@ -294,6 +298,9 @@ impl LocalViewer {
                     indexed_at,
                     viewer: None,
                     labels: None,
+                    quote_count: None,
+                    bookmark_count: None,
+                    threadgate_record: None,
                 }))
             }
         }
@@ -512,6 +519,10 @@ impl LocalViewer {
             viewer,
             labels,
             created_at,
+            pronouns: None,
+            verification: None,
+            status: None,
+            debug: None,
         }
     }
 
@@ -524,6 +535,7 @@ impl LocalViewer {
             avatar,
             labels,
             indexed_at,
+            ..
         } = view;
         let ProfileViewBasic {
             did,
@@ -541,6 +553,10 @@ impl LocalViewer {
                 viewer: None,
                 labels: Some(labels),
                 created_at: None,
+                pronouns: None,
+                verification: None,
+                status: None,
+                debug: None,
             },
             record,
         );
@@ -552,6 +568,13 @@ impl LocalViewer {
             avatar,
             labels: vec![],
             indexed_at,
+            pronouns: None,
+            created_at: None,
+            associated: None,
+            viewer: None,
+            verification: None,
+            status: None,
+            debug: None,
         }
     }
 
@@ -585,6 +608,7 @@ impl LocalViewer {
             avatar,
             labels,
             indexed_at,
+            ..
         } = self.update_profile_view(
             ProfileView {
                 did,
@@ -594,6 +618,13 @@ impl LocalViewer {
                 avatar,
                 labels,
                 indexed_at,
+                pronouns: None,
+                created_at: None,
+                associated: None,
+                viewer: None,
+                verification: None,
+                status: None,
+                debug: None,
             },
             record.clone(),
         );
@@ -621,6 +652,11 @@ impl LocalViewer {
             labels,
             indexed_at,
             created_at,
+            website: None,
+            pinned_post: None,
+            verification: None,
+            status: None,
+            debug: None,
         }
     }
 

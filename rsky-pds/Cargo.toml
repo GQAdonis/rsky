@@ -48,6 +48,7 @@ rsky-common = { workspace = true }
 rsky-crypto = { workspace = true }
 rsky-identity = { workspace = true }
 rsky-lexicon = { workspace = true }
+rsky-oauth-scopes = { workspace = true }
 rsky-repo = { workspace = true }
 rsky-syntax = { workspace = true }
 secp256k1 = { workspace = true }
