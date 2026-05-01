@@ -15,3 +15,5 @@ data:
   AWS_ENDPOINT_URL: "https://storage.googleapis.com"
   AWS_DEFAULT_REGION: "auto"
   PDS_INVITE_REQUIRED: "false"
+  PDS_BSKY_APP_VIEW_URL: "https://appview.know-me.tools"
+  PDS_BSKY_APP_VIEW_DID: "did:web:appview.know-me.tools"

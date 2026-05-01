@@ -26,6 +26,8 @@ spec:
           ports:
             - name: http
               containerPort: 9000
+            - name: metrics
+              containerPort: 9090
           envFrom:
             - secretRef:
                 name: rsky-relay-secrets
