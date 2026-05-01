@@ -16,6 +16,12 @@ use tracing::{error, info};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt().with_target(false).init();
 
+    // Install the default Rustls crypto provider (aws-lc-rs) so that
+    // tokio-tungstenite WSS connections work without panicking.
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .ok(); // ok() — ignore if already installed
+
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://localhost/appview".to_string());
     let db = create_pool(&database_url, 32)
