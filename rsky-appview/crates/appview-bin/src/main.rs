@@ -1,6 +1,6 @@
 use appview_api::{AppStateInner, create_router};
 use appview_core::error::AppViewError;
-use appview_db::create_pool;
+use appview_db::{create_pool, run_migrations};
 use appview_firehose::FirehoseConsumer;
 use appview_indexer::Indexer;
 use appview_queue::IndexQueue;
@@ -24,6 +24,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Database pool created");
 
+    // Run schema migrations on startup — creates tables if they don't exist.
+    // The migration SQL is embedded at compile time.
+    run_migrations(&db).await.map_err(|e| AppViewError::Database(e.to_string()))?;
+    info!("Schema migrations applied");
+
     let handle: PrometheusHandle = metrics_exporter_prometheus::PrometheusBuilder::new()
         .install_recorder()
         .expect("failed to install Prometheus recorder");
@@ -33,13 +38,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )))?);
     let state = Arc::new(AppStateInner::new(&database_url).await?);
 
-    // Firehose consumer
+    // Firehose consumer — relay hosts from RELAY_HOSTS env var (comma-separated WSS URLs)
+    // Falls back to the public Bluesky relay if not set.
+    let relay_hosts: Vec<String> = std::env::var("RELAY_HOSTS")
+        .unwrap_or_else(|_| "wss://bsky.network".to_string())
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .map(|host| {
+            // Ensure the full XRPC path is appended if not already present
+            if host.contains("/xrpc/") {
+                host
+            } else {
+                format!("{}/xrpc/com.atproto.sync.subscribeRepos", host.trim_end_matches('/'))
+            }
+        })
+        .collect();
+
+    info!("Connecting to relay hosts: {:?}", relay_hosts);
+
     let firehose_queue = queue.clone();
     tokio::spawn(async move {
-        let consumer = FirehoseConsumer::new(
-            vec!["wss://bsky.network/xrpc/com.atproto.sync.subscribeRepos".to_string()],
-            firehose_queue,
-        );
+        let consumer = FirehoseConsumer::new(relay_hosts, firehose_queue);
         if let Err(e) = consumer.run().await {
             error!("Firehose consumer error: {}", e);
         }
