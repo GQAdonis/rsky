@@ -8203,6 +8203,7 @@ dependencies = [
  "rsky-crypto",
  "rsky-identity",
  "rsky-lexicon",
+ "rsky-oauth-scopes",
  "rsky-repo",
  "rsky-syntax",
  "secp256k1",
