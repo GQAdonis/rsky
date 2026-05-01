@@ -2,6 +2,7 @@ use crate::app::bsky::graph::{ListViewBasic, StarterPackViewBasic};
 use crate::com::atproto::label::{Label, SelfLabels};
 use crate::com::atproto::repo::{Blob, StrongRef};
 use chrono::{DateTime, Utc};
+use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct GetPreferencesOutput {
@@ -51,6 +52,8 @@ pub struct ProfileViewBasic {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub pronouns: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub avatar: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub associated: Option<RefProfileAssociated>,
@@ -60,6 +63,12 @@ pub struct ProfileViewBasic {
     pub labels: Option<Vec<Label>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verification: Option<VerificationState>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<StatusView>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub debug: Option<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -70,12 +79,26 @@ pub struct ProfileView {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub pronouns: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub avatar: Option<String>,
     pub labels: Vec<Label>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub indexed_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub associated: Option<RefProfileAssociated>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub viewer: Option<ViewerState>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verification: Option<VerificationState>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<StatusView>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub debug: Option<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -91,6 +114,8 @@ pub struct ProfileViewDetailed {
     pub avatar: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub banner: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub website: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub followers_count: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -108,6 +133,14 @@ pub struct ProfileViewDetailed {
     pub indexed_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pinned_post: Option<StrongRef>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verification: Option<VerificationState>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<StatusView>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub debug: Option<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -129,6 +162,10 @@ pub struct RefProfileAssociated {
     pub labeler: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chat: Option<RefProfileAssociatedChat>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub activity_subscription: Option<ProfileAssociatedActivitySubscription>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub germ: Option<ProfileAssociatedGerm>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -136,6 +173,8 @@ pub struct RefProfileAssociated {
 pub struct RefProfileAssociatedChat {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allow_incoming: Option<AssociatedChatAllowIncoming>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allow_group_invites: Option<AssociatedChatAllowIncoming>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -158,6 +197,8 @@ pub struct ViewerState {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blocked_by: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub blocking: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub blocking_by_list: Option<ListViewBasic>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub following: Option<String>,
@@ -165,6 +206,8 @@ pub struct ViewerState {
     pub followed_by: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub known_followers: Option<KnownFollowers>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub activity_subscription: Option<ActivitySubscription>,
 }
 
 /// The subject's followers whom you also follow
@@ -201,6 +244,14 @@ pub enum RefPreferences {
     BskyAppStatePref(BskyAppStatePref),
     #[serde(rename = "app.bsky.actor.defs#labelersPref")]
     LabelersPref(LabelersPref),
+    #[serde(rename = "app.bsky.actor.defs#declaredAgePref")]
+    DeclaredAgePref(DeclaredAgePref),
+    #[serde(rename = "app.bsky.actor.defs#postInteractionSettingsPref")]
+    PostInteractionSettingsPref(PostInteractionSettingsPref),
+    #[serde(rename = "app.bsky.actor.defs#verificationPrefs")]
+    VerificationPrefs(VerificationPrefs),
+    #[serde(rename = "app.bsky.actor.defs#liveEventPreferences")]
+    LiveEventPreferences(LiveEventPreferences),
 }
 
 impl RefPreferences {
@@ -218,6 +269,12 @@ impl RefPreferences {
             RefPreferences::HiddenPostsPref(_) => "app.bsky.actor.defs#hiddenPostsPref",
             RefPreferences::BskyAppStatePref(_) => "app.bsky.actor.defs#bskyAppStatePref",
             RefPreferences::LabelersPref(_) => "app.bsky.actor.defs#labelersPref",
+            RefPreferences::DeclaredAgePref(_) => "app.bsky.actor.defs#declaredAgePref",
+            RefPreferences::PostInteractionSettingsPref(_) => {
+                "app.bsky.actor.defs#postInteractionSettingsPref"
+            }
+            RefPreferences::VerificationPrefs(_) => "app.bsky.actor.defs#verificationPrefs",
+            RefPreferences::LiveEventPreferences(_) => "app.bsky.actor.defs#liveEventPreferences",
         };
         r#type.to_string()
     }
@@ -320,6 +377,7 @@ pub enum ThreadViewSort {
     #[serde(rename = "most-likes")]
     MostLikes,
     Random,
+    Hotness,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -391,6 +449,134 @@ pub struct LabelersPrefItem {
     pub did: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeclaredAgePref {
+    pub age: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PostInteractionSettingsPref {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub set_max_likes: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub set_max_follows: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub set_max_posts: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_interaction_prefs: Option<ContentInteractionPref>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContentInteractionPref {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub set_likes: Option<InteractionPreset>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub set_reposts: Option<InteractionPreset>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub set_follows: Option<InteractionPreset>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub set_quotes: Option<InteractionPreset>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum InteractionPreset {
+    Like,
+    #[serde(rename = "like+reply")]
+    LikeReply,
+    None,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VerificationPrefs {
+    pub phone_verified: Option<bool>,
+    pub email_verified: Option<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveEventPreferences {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allow_new_live_engagement: Option<LiveEventAllowNewEngagement>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visibility: Option<LiveEventPrefVisibility>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reminder: Option<LiveEventReminder>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LiveEventAllowNewEngagement {
+    All,
+    Following,
+    None,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LiveEventPrefVisibility {
+    All,
+    Following,
+    None,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LiveEventReminder {
+    All,
+    Following,
+    None,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileAssociatedActivitySubscription {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uri: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cid: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileAssociatedGerm {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub list_uri: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub list_cid: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivitySubscription {
+    pub uri: String,
+    pub cid: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VerificationState {
+    pub platforms: Option<Vec<PlatformInfo>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformInfo {
+    pub platform: String,
+    pub verified: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusView {
+    pub active: Option<bool>,
+    pub muted_by_list: Option<ListViewBasic>,
+    pub uri: Option<String>,
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -401,19 +587,27 @@ mod tests {
             did: "did:plc:abc".to_string(),
             handle: "alice.bsky.social".to_string(),
             display_name: None,
+            pronouns: None,
             avatar: None,
             associated: None,
             viewer: None,
             labels: None,
             created_at: None,
+            verification: None,
+            status: None,
+            debug: None,
         };
         let json = serde_json::to_value(&view).unwrap();
         assert!(!json.as_object().unwrap().contains_key("displayName"));
+        assert!(!json.as_object().unwrap().contains_key("pronouns"));
         assert!(!json.as_object().unwrap().contains_key("avatar"));
         assert!(!json.as_object().unwrap().contains_key("associated"));
         assert!(!json.as_object().unwrap().contains_key("viewer"));
         assert!(!json.as_object().unwrap().contains_key("labels"));
         assert!(!json.as_object().unwrap().contains_key("createdAt"));
+        assert!(!json.as_object().unwrap().contains_key("verification"));
+        assert!(!json.as_object().unwrap().contains_key("status"));
+        assert!(!json.as_object().unwrap().contains_key("debug"));
         assert_eq!(json["did"], "did:plc:abc");
         assert_eq!(json["handle"], "alice.bsky.social");
     }
@@ -427,6 +621,7 @@ mod tests {
             description: None,
             avatar: None,
             banner: None,
+            website: None,
             followers_count: None,
             follows_count: None,
             posts_count: None,
@@ -436,14 +631,20 @@ mod tests {
             labels: vec![],
             indexed_at: None,
             created_at: None,
+            pinned_post: None,
+            verification: None,
+            status: None,
+            debug: None,
         };
         let json = serde_json::to_value(&view).unwrap();
         let obj = json.as_object().unwrap();
         for key in &[
             "displayName",
+            "pronouns",
             "description",
             "avatar",
             "banner",
+            "website",
             "followersCount",
             "followsCount",
             "postsCount",
@@ -452,6 +653,10 @@ mod tests {
             "viewer",
             "indexedAt",
             "createdAt",
+            "pinnedPost",
+            "verification",
+            "status",
+            "debug",
         ] {
             assert!(!obj.contains_key(*key), "expected key `{key}` to be absent");
         }
@@ -463,10 +668,12 @@ mod tests {
             muted: None,
             muted_by_list: None,
             blocked_by: None,
+            blocking: None,
             blocking_by_list: None,
             following: None,
             followed_by: None,
             known_followers: None,
+            activity_subscription: None,
         };
         let json = serde_json::to_value(&viewer).unwrap();
         let obj = json.as_object().unwrap();
@@ -481,6 +688,8 @@ mod tests {
             starter_packs: None,
             labeler: None,
             chat: None,
+            activity_subscription: None,
+            germ: None,
         };
         let json = serde_json::to_value(&associated).unwrap();
         let obj = json.as_object().unwrap();
@@ -493,11 +702,15 @@ mod tests {
             did: "did:plc:abc".to_string(),
             handle: "alice.bsky.social".to_string(),
             display_name: Some("Alice".to_string()),
+            pronouns: None,
             avatar: Some("https://cdn.example.com/avatar.jpg".to_string()),
             associated: None,
             viewer: None,
             labels: None,
             created_at: Some("2024-01-01T00:00:00Z".to_string()),
+            verification: None,
+            status: None,
+            debug: None,
         };
         let json = serde_json::to_value(&view).unwrap();
         assert_eq!(json["displayName"], "Alice");

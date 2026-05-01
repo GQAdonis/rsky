@@ -1,4 +1,6 @@
 pub mod like;
+pub mod postgate;
+pub mod threadgate;
 
 use super::actor::ProfileView;
 use crate::app::bsky::actor::{ProfileViewBasic, ViewerState};
@@ -58,8 +60,14 @@ pub struct PostView {
     pub repost_count: Option<usize>,
     pub like_count: Option<usize>,
     pub indexed_at: String,
-    pub viewer: Option<ViewerState>,
+    pub viewer: Option<FeedViewerState>,
     pub labels: Option<Vec<Label>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quote_count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bookmark_count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub threadgate_record: Option<Record>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -77,6 +85,23 @@ pub struct FeedViewPost {
     pub reason: Option<ReasonRepost>,
     /// Context provided by feed generator that may be passed back alongside interactions.
     pub feed_context: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FeedViewerState {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repost: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub like: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thread_muted: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embedding_media_muted: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embedding_images_muted: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embedding_all_images_muted: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -170,10 +195,13 @@ pub struct GetLikesOutput {
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ThreadViewPost {
     pub post: PostView,
     pub parent: Option<Box<ThreadViewPostEnum>>,
     pub replies: Option<Vec<Box<ThreadViewPostEnum>>>,
+    /// Context from the feed generator that may be passed back during interactions.
+    pub feed_context: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -241,4 +269,12 @@ pub struct GetPostThread {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct GetPostThreadOutput {
     pub thread: ThreadViewPostEnum,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Record {
+    pub r#type: String,
+    #[serde(flatten)]
+    pub extra: Value,
 }

@@ -182,6 +182,18 @@ pub struct RefRepo {
     pub status: Option<RepoStatus>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Repo {
+    pub did: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ListReposByCollectionOutput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+    pub repos: Vec<Repo>,
+}
+
 pub fn deserialize_cid_v1<'de, D>(deserializer: D) -> Result<Cid, D::Error>
 where
     D: Deserializer<'de>,

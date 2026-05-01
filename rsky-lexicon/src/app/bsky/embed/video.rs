@@ -9,12 +9,21 @@ pub struct Video {
     /// Alt text description of video image, for accessibility
     pub alt: Option<String>,
     pub aspect_ratio: Option<AspectRatio>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub presentation: Option<VideoPresentation>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Caption {
     pub lang: String,
     pub file: Blob,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum VideoPresentation {
+    Default,
+    Gif,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -27,4 +36,6 @@ pub struct View {
     pub thumbnail: Option<String>,
     pub alt: Option<String>,
     pub aspect_ratio: Option<AspectRatio>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub presentation: Option<VideoPresentation>,
 }
