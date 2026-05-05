@@ -35,22 +35,77 @@ env:
   REGISTRY: ghcr.io/know-me-tools
 
 jobs:
+  # ── Detect changed paths via git diff (reliable for all push types) ─────────
+  changes:
+    name: Detect changed files
+    runs-on: ubuntu-latest
+    outputs:
+      pds: ${{ steps.filter.outputs.pds }}
+      relay: ${{ steps.filter.outputs.relay }}
+      feedgen: ${{ steps.filter.outputs.feedgen }}
+      labeler: ${{ steps.filter.outputs.labeler }}
+      jetstream: ${{ steps.filter.outputs.jetstream }}
+      wintermute: ${{ steps.filter.outputs.wintermute }}
+      appview: ${{ steps.filter.outputs.appview }}
+      web_client: ${{ steps.filter.outputs.web_client }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            pds:
+              - 'rsky-pds/**'
+              - 'rsky-common/**'
+              - 'rsky-lexicon/**'
+              - 'rsky-repo/**'
+              - 'rsky-crypto/**'
+              - 'rsky-syntax/**'
+              - 'rsky-identity/**'
+              - 'Cargo.lock'
+            relay:
+              - 'rsky-relay/**'
+              - 'rsky-common/**'
+              - 'rsky-firehose/**'
+              - 'Cargo.lock'
+            feedgen:
+              - 'rsky-feedgen/**'
+              - 'rsky-common/**'
+              - 'rsky-lexicon/**'
+              - 'Cargo.lock'
+            labeler:
+              - 'rsky-labeler/**'
+              - 'rsky-common/**'
+              - 'Cargo.lock'
+            jetstream:
+              - 'rsky-jetstream-subscriber/**'
+              - 'Cargo.lock'
+            wintermute:
+              - 'rsky-wintermute/**'
+              - 'rsky-common/**'
+              - 'rsky-identity/**'
+              - 'rsky-repo/**'
+              - 'Cargo.lock'
+            appview:
+              - 'rsky-appview/**'
+              - 'rsky-common/**'
+              - 'rsky-lexicon/**'
+              - 'rsky-repo/**'
+              - 'rsky-firehose/**'
+              - 'Cargo.lock'
+            web_client:
+              - 'web-client/**'
+              - 'Dockerfile.web-client'
+              - '.github/workflows/deploy.yml'
+
   # ── Build images in parallel ────────────────────────────────────────────────
   build-pds:
     name: Build rsky-pds
+    needs: changes
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      contains(toJson(github.event.commits), '"rsky-pds/') ||
-      contains(toJson(github.event.head_commit), '"rsky-pds/') ||
-      contains(toJson(github.event.commits), '"rsky-common/') ||
-      contains(toJson(github.event.head_commit), '"rsky-common/') ||
-      contains(toJson(github.event.commits), '"rsky-lexicon/') ||
-      contains(toJson(github.event.head_commit), '"rsky-lexicon/') ||
-      contains(toJson(github.event.commits), '"rsky-repo/') ||
-      contains(toJson(github.event.head_commit), '"rsky-repo/') ||
-      contains(toJson(github.event.commits), '"Cargo.lock"') ||
-      contains(toJson(github.event.head_commit), '"Cargo.lock"')
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.pds == 'true'
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
     steps:
@@ -82,17 +137,9 @@ jobs:
 
   build-relay:
     name: Build rsky-relay
+    needs: changes
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      contains(toJson(github.event.commits), '"rsky-relay/') ||
-      contains(toJson(github.event.head_commit), '"rsky-relay/') ||
-      contains(toJson(github.event.commits), '"rsky-common/') ||
-      contains(toJson(github.event.head_commit), '"rsky-common/') ||
-      contains(toJson(github.event.commits), '"rsky-firehose/') ||
-      contains(toJson(github.event.head_commit), '"rsky-firehose/') ||
-      contains(toJson(github.event.commits), '"Cargo.lock"') ||
-      contains(toJson(github.event.head_commit), '"Cargo.lock"')
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.relay == 'true'
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
     steps:
@@ -124,13 +171,9 @@ jobs:
 
   build-feedgen:
     name: Build rsky-feedgen
+    needs: changes
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      contains(toJson(github.event.commits), '"rsky-feedgen/') ||
-      contains(toJson(github.event.head_commit), '"rsky-feedgen/') ||
-      contains(toJson(github.event.commits), '"Cargo.lock"') ||
-      contains(toJson(github.event.head_commit), '"Cargo.lock"')
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.feedgen == 'true'
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
     steps:
@@ -162,13 +205,9 @@ jobs:
 
   build-labeler:
     name: Build rsky-labeler
+    needs: changes
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      contains(toJson(github.event.commits), '"rsky-labeler/') ||
-      contains(toJson(github.event.head_commit), '"rsky-labeler/') ||
-      contains(toJson(github.event.commits), '"Cargo.lock"') ||
-      contains(toJson(github.event.head_commit), '"Cargo.lock"')
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.labeler == 'true'
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
     steps:
@@ -200,13 +239,9 @@ jobs:
 
   build-jetstream:
     name: Build rsky-jetstream-subscriber
+    needs: changes
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      contains(toJson(github.event.commits), '"rsky-jetstream-subscriber/') ||
-      contains(toJson(github.event.head_commit), '"rsky-jetstream-subscriber/') ||
-      contains(toJson(github.event.commits), '"Cargo.lock"') ||
-      contains(toJson(github.event.head_commit), '"Cargo.lock"')
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.jetstream == 'true'
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
     steps:
@@ -238,19 +273,9 @@ jobs:
 
   build-wintermute:
     name: Build rsky-wintermute
+    needs: changes
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      contains(toJson(github.event.commits), '"rsky-wintermute/') ||
-      contains(toJson(github.event.head_commit), '"rsky-wintermute/') ||
-      contains(toJson(github.event.commits), '"rsky-common/') ||
-      contains(toJson(github.event.head_commit), '"rsky-common/') ||
-      contains(toJson(github.event.commits), '"rsky-identity/') ||
-      contains(toJson(github.event.head_commit), '"rsky-identity/') ||
-      contains(toJson(github.event.commits), '"rsky-repo/') ||
-      contains(toJson(github.event.head_commit), '"rsky-repo/') ||
-      contains(toJson(github.event.commits), '"Cargo.lock"') ||
-      contains(toJson(github.event.head_commit), '"Cargo.lock"')
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.wintermute == 'true'
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
     steps:
@@ -282,19 +307,9 @@ jobs:
 
   build-appview:
     name: Build rsky-appview
+    needs: changes
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      contains(toJson(github.event.commits), '"rsky-appview/') ||
-      contains(toJson(github.event.head_commit), '"rsky-appview/') ||
-      contains(toJson(github.event.commits), '"rsky-common/') ||
-      contains(toJson(github.event.head_commit), '"rsky-common/') ||
-      contains(toJson(github.event.commits), '"rsky-lexicon/') ||
-      contains(toJson(github.event.head_commit), '"rsky-lexicon/') ||
-      contains(toJson(github.event.commits), '"rsky-repo/') ||
-      contains(toJson(github.event.head_commit), '"rsky-repo/') ||
-      contains(toJson(github.event.commits), '"Cargo.lock"') ||
-      contains(toJson(github.event.head_commit), '"Cargo.lock"')
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.appview == 'true'
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
     steps:
@@ -326,15 +341,9 @@ jobs:
 
   build-web-client:
     name: Build web-client
+    needs: changes
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      contains(toJson(github.event.commits), '"web-client/') ||
-      contains(toJson(github.event.head_commit), '"web-client/') ||
-      contains(toJson(github.event.commits), '"Dockerfile.web-client"') ||
-      contains(toJson(github.event.head_commit), '"Dockerfile.web-client"') ||
-      contains(toJson(github.event.commits), '".github/workflows/deploy.yml"') ||
-      contains(toJson(github.event.head_commit), '".github/workflows/deploy.yml"')
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.web_client == 'true'
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
     steps:
@@ -372,6 +381,7 @@ jobs:
     name: Deploy to GKE
     runs-on: ubuntu-latest
     needs:
+      - changes
       - build-pds
       - build-relay
       - build-feedgen
