@@ -489,6 +489,7 @@ jobs:
           kubectl apply -f k8s/rsky-pds/certificate.yaml
           kubectl apply -f k8s/rsky-pds/httproute-https.yaml
           kubectl apply -f k8s/rsky-pds/httproute-redirect.yaml
+          kubectl apply -f k8s/rsky-pds/httproute-handles.yaml
 
       - name: Deploy rsky-pds StatefulSet
         run: |
@@ -558,10 +559,6 @@ jobs:
       - name: Apply rsky-wintermute manifests
         run: |
           kubectl apply -f k8s/rsky-wintermute/service.yaml
-          kubectl apply -f k8s/rsky-wintermute/gateway.yaml
-          kubectl apply -f k8s/rsky-wintermute/certificate.yaml
-          kubectl apply -f k8s/rsky-wintermute/httproute-https.yaml
-          kubectl apply -f k8s/rsky-wintermute/httproute-redirect.yaml
 
       - name: Deploy rsky-wintermute StatefulSet
         run: |
