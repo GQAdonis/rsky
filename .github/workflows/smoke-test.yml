@@ -1,0 +1,51 @@
+name: Nightly Smoke Test
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 06:00 UTC daily
+  workflow_dispatch:
+    inputs:
+      use_existing:
+        description: 'Use existing test account (true) or create new one (false)'
+        required: false
+        default: 'true'
+
+jobs:
+  smoke-test:
+    name: AT Protocol E2E Smoke Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get install -y jq dnsutils
+
+      - name: Run smoke test (existing account)
+        if: github.event.inputs.use_existing != 'false'
+        env:
+          PDS_URL: https://pds.know-me.tools
+          APPVIEW_URL: https://appview.know-me.tools
+          RELAY_URL: https://relay.know-me.tools
+          TEST_HANDLE: ${{ secrets.SMOKE_TEST_HANDLE }}
+          TEST_PASSWORD: ${{ secrets.SMOKE_TEST_PASSWORD }}
+        run: |
+          bash tests/e2e/smoke_test.sh \
+            --use-existing \
+            --handle "${TEST_HANDLE:-alice.know-me.tools}" \
+            --password "${TEST_PASSWORD:-TestPass123!}"
+
+      - name: Run smoke test (new account)
+        if: github.event.inputs.use_existing == 'false'
+        env:
+          PDS_URL: https://pds.know-me.tools
+          APPVIEW_URL: https://appview.know-me.tools
+          RELAY_URL: https://relay.know-me.tools
+        run: bash tests/e2e/smoke_test.sh
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Smoke test failed! Check the AT Protocol stack at know-me.tools"
+          # Future: add Slack/PushNotification webhook here
