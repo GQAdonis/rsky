@@ -501,12 +501,14 @@ jobs:
           kubectl apply -f k8s/rsky-pds/httproute-redirect.yaml
           kubectl apply -f k8s/rsky-pds/httproute-handles.yaml
 
+      # Only apply statefulset/deployment when the corresponding build ran.
+      # The SHA-based image tag change is what triggers Kubernetes to roll out
+      # new pods — no manual rollout restart needed.
       - name: Deploy rsky-pds StatefulSet
+        if: needs.build-pds.result == 'success'
         run: |
-          IMAGE_TAG="${{ needs.build-pds.outputs.image_tag }}"
-          : "${IMAGE_TAG:=latest}"
-          sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-pds/statefulset.yaml \
-            | kubectl apply -f -
+          sed "s|IMAGE_TAG|${{ needs.build-pds.outputs.image_tag }}|g" \
+            k8s/rsky-pds/statefulset.yaml | kubectl apply -f -
 
       # ── rsky-relay ────────────────────────────────────────────────────────
       - name: Apply rsky-relay manifests
@@ -518,11 +520,10 @@ jobs:
           kubectl apply -f k8s/rsky-relay/httproute-redirect.yaml
 
       - name: Deploy rsky-relay StatefulSet
+        if: needs.build-relay.result == 'success'
         run: |
-          IMAGE_TAG="${{ needs.build-relay.outputs.image_tag }}"
-          : "${IMAGE_TAG:=latest}"
-          sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-relay/statefulset.yaml \
-            | kubectl apply -f -
+          sed "s|IMAGE_TAG|${{ needs.build-relay.outputs.image_tag }}|g" \
+            k8s/rsky-relay/statefulset.yaml | kubectl apply -f -
 
       # ── rsky-feedgen ──────────────────────────────────────────────────────
       - name: Apply rsky-feedgen manifests
@@ -535,11 +536,10 @@ jobs:
           kubectl apply -f k8s/rsky-feedgen/httproute-redirect.yaml
 
       - name: Deploy rsky-feedgen Deployment
+        if: needs.build-feedgen.result == 'success'
         run: |
-          IMAGE_TAG="${{ needs.build-feedgen.outputs.image_tag }}"
-          : "${IMAGE_TAG:=latest}"
-          sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-feedgen/deployment.yaml \
-            | kubectl apply -f -
+          sed "s|IMAGE_TAG|${{ needs.build-feedgen.outputs.image_tag }}|g" \
+            k8s/rsky-feedgen/deployment.yaml | kubectl apply -f -
 
       # ── rsky-labeler ──────────────────────────────────────────────────────
       - name: Apply rsky-labeler manifests
@@ -547,11 +547,10 @@ jobs:
           kubectl apply -f k8s/rsky-labeler/configmap.yaml
 
       - name: Deploy rsky-labeler Deployment
+        if: needs.build-labeler.result == 'success'
         run: |
-          IMAGE_TAG="${{ needs.build-labeler.outputs.image_tag }}"
-          : "${IMAGE_TAG:=latest}"
-          sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-labeler/deployment.yaml \
-            | kubectl apply -f -
+          sed "s|IMAGE_TAG|${{ needs.build-labeler.outputs.image_tag }}|g" \
+            k8s/rsky-labeler/deployment.yaml | kubectl apply -f -
 
       # ── rsky-jetstream-subscriber ─────────────────────────────────────────
       - name: Apply rsky-jetstream-subscriber manifests
@@ -559,11 +558,10 @@ jobs:
           kubectl apply -f k8s/rsky-jetstream-subscriber/configmap.yaml
 
       - name: Deploy rsky-jetstream-subscriber Deployment
+        if: needs.build-jetstream.result == 'success'
         run: |
-          IMAGE_TAG="${{ needs.build-jetstream.outputs.image_tag }}"
-          : "${IMAGE_TAG:=latest}"
-          sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-jetstream-subscriber/deployment.yaml \
-            | kubectl apply -f -
+          sed "s|IMAGE_TAG|${{ needs.build-jetstream.outputs.image_tag }}|g" \
+            k8s/rsky-jetstream-subscriber/deployment.yaml | kubectl apply -f -
 
       # ── rsky-wintermute ───────────────────────────────────────────────────
       - name: Apply rsky-wintermute manifests
@@ -571,11 +569,10 @@ jobs:
           kubectl apply -f k8s/rsky-wintermute/service.yaml
 
       - name: Deploy rsky-wintermute StatefulSet
+        if: needs.build-wintermute.result == 'success'
         run: |
-          IMAGE_TAG="${{ needs.build-wintermute.outputs.image_tag }}"
-          : "${IMAGE_TAG:=latest}"
-          sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-wintermute/statefulset.yaml \
-            | kubectl apply -f -
+          sed "s|IMAGE_TAG|${{ needs.build-wintermute.outputs.image_tag }}|g" \
+            k8s/rsky-wintermute/statefulset.yaml | kubectl apply -f -
 
       # ── rsky-appview ──────────────────────────────────────────────────────
       - name: Apply rsky-appview manifests
@@ -588,11 +585,10 @@ jobs:
           kubectl apply -f k8s/rsky-appview/httproute-redirect.yaml
 
       - name: Deploy rsky-appview StatefulSet
+        if: needs.build-appview.result == 'success'
         run: |
-          IMAGE_TAG="${{ needs.build-appview.outputs.image_tag }}"
-          : "${IMAGE_TAG:=latest}"
-          sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/rsky-appview/statefulset.yaml \
-            | kubectl apply -f -
+          sed "s|IMAGE_TAG|${{ needs.build-appview.outputs.image_tag }}|g" \
+            k8s/rsky-appview/statefulset.yaml | kubectl apply -f -
 
       # ── web-client ────────────────────────────────────────────────────────
       - name: Apply web-client manifests
@@ -605,11 +601,10 @@ jobs:
           kubectl apply -f k8s/web-client/httproute-redirect.yaml
 
       - name: Deploy web-client Deployment
+        if: needs.build-web-client.result == 'success'
         run: |
-          IMAGE_TAG="${{ needs.build-web-client.outputs.image_tag }}"
-          : "${IMAGE_TAG:=latest}"
-          sed "s|IMAGE_TAG|${IMAGE_TAG}|g" k8s/web-client/deployment.yaml \
-            | kubectl apply -f -
+          sed "s|IMAGE_TAG|${{ needs.build-web-client.outputs.image_tag }}|g" \
+            k8s/web-client/deployment.yaml | kubectl apply -f -
 
       # ── Rollout waits ─────────────────────────────────────────────────────
       - name: Wait for rollouts
