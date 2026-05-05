@@ -13,7 +13,7 @@ spec:
       tls:
         mode: Terminate
         certificateRefs:
-          - name: pds-know-me-tools-tls
+          - name: wildcard-know-me-tools-tls
             kind: Secret
     - name: http
       protocol: HTTP
@@ -26,7 +26,7 @@ spec:
       tls:
         mode: Terminate
         certificateRefs:
-          - name: handles-know-me-tools-tls
+          - name: wildcard-know-me-tools-tls
             kind: Secret
     - name: handles-http
       protocol: HTTP

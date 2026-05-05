@@ -13,7 +13,7 @@ spec:
       tls:
         mode: Terminate
         certificateRefs:
-          - name: relay-know-me-tools-tls
+          - name: wildcard-know-me-tools-tls
             kind: Secret
     - name: http
       protocol: HTTP
