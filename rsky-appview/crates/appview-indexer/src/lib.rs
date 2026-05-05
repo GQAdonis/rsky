@@ -31,8 +31,8 @@ impl Indexer {
         loop {
             ticker.tick().await;
 
-            match self.queue.dequeue_live()? {
-                Some((_key, job)) => {
+            match self.queue.dequeue_live() {
+                Ok(Some((_key, job))) => {
                     let permit = self.semaphore.clone().acquire_owned().await.map_err(|e| {
                         AppViewError::Internal(format!("failed to acquire semaphore: {e}"))
                     })?;
@@ -45,7 +45,12 @@ impl Indexer {
                         drop(permit);
                     });
                 }
-                None => {}
+                Ok(None) => {}
+                Err(e) => {
+                    // Log deserialization errors but don't stop the indexer.
+                    // Corrupted or incompatible queue entries are discarded.
+                    warn!("failed to dequeue live job (skipping): {e}");
+                }
             }
         }
     }
@@ -57,8 +62,8 @@ impl Indexer {
         loop {
             ticker.tick().await;
 
-            match self.queue.dequeue_backfill()? {
-                Some((_key, job)) => {
+            match self.queue.dequeue_backfill() {
+                Ok(Some((_key, job))) => {
                     let permit = self.semaphore.clone().acquire_owned().await.map_err(|e| {
                         AppViewError::Internal(format!("failed to acquire semaphore: {e}"))
                     })?;
@@ -71,7 +76,10 @@ impl Indexer {
                         drop(permit);
                     });
                 }
-                None => {}
+                Ok(None) => {}
+                Err(e) => {
+                    warn!("failed to dequeue backfill job (skipping): {e}");
+                }
             }
         }
     }
@@ -89,12 +97,17 @@ async fn process_job(job: &IndexJob, pool: &PgPool) -> Result<()> {
         job.rev
     );
 
+    let record: Option<serde_json::Value> = job
+        .record_json
+        .as_deref()
+        .and_then(|s| serde_json::from_str(s).ok());
+
     match &job.operation {
         IndexOperation::Create { uri, cid } => {
-            index_record(uri, cid, &job.repo, &job.record, pool).await?;
+            index_record(uri, cid, &job.repo, &record, pool).await?;
         }
         IndexOperation::Update { uri, cid } => {
-            index_record(uri, cid, &job.repo, &job.record, pool).await?;
+            index_record(uri, cid, &job.repo, &record, pool).await?;
         }
         IndexOperation::Delete { uri } => {
             delete_record(uri, &job.repo, pool).await?;

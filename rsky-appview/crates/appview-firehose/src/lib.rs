@@ -282,11 +282,13 @@ impl FirehoseConsumer {
         cid_str: &str,
         block_map: &Option<rsky_repo::block_map::BlockMap>,
         uri: &str,
-    ) -> Option<serde_json::Value> {
+    ) -> Option<String> {
         let blocks = block_map.as_ref()?;
         let cid = lexicon_cid::Cid::try_from(cid_str).ok()?;
         match rsky_repo::parse::get_and_parse_record(blocks, cid) {
-            Ok(parsed) => serde_json::to_value(&parsed.record).ok(),
+            Ok(parsed) => serde_json::to_value(&parsed.record)
+                .ok()
+                .and_then(|v| serde_json::to_string(&v).ok()),
             Err(e) => {
                 debug!("failed to parse record for {uri}: {e}");
                 None
@@ -367,7 +369,7 @@ impl FirehoseConsumer {
                         commit_cid: commit.commit.to_string(),
                         rev: commit.rev.clone(),
                         operation,
-                        record,
+                        record_json: record,
                     };
 
                     queue.enqueue_live(&job)?;

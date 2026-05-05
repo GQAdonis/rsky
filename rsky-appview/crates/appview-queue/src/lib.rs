@@ -21,8 +21,10 @@ pub struct IndexJob {
     pub commit_cid: String,
     pub rev: String,
     pub operation: IndexOperation,
+    // Stored as raw JSON string to avoid bincode/serde_json::Value incompatibility.
+    // bincode does not support deserialize_any which serde_json::Value requires.
     #[serde(default)]
-    pub record: Option<serde_json::Value>,
+    pub record_json: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
