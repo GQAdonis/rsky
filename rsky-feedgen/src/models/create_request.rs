@@ -12,13 +12,22 @@ pub enum Lexicon {
         serialize = "app.bsky.graph.follow"
     ))]
     AppBskyFeedFollow(rsky_lexicon::app::bsky::graph::follow::Follow),
+    #[serde(rename(
+        deserialize = "app.bsky.feed.repost",
+        serialize = "app.bsky.feed.repost"
+    ))]
+    AppBskyFeedRepost(rsky_lexicon::app::bsky::feed::Repost),
 }
 
+// Deserializes any record type without panicking on unknown variants.
+// `Lexicon` handles known types; `Label` handles AT Protocol label records;
+// `Unknown` absorbs anything else so the handler can return 200 rather than crash.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum CreateRecord {
     Lexicon(Lexicon),
     Label(Label),
+    Unknown(serde_json::Value),
 }
 
 #[derive(Debug, Serialize, Deserialize)]

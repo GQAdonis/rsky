@@ -12,7 +12,7 @@ use appview_livekit::{BillingGate, LiveKitConfig, TokenMinter};
 use appview_webrtc::SessionStore;
 use axum::{
     Router,
-    routing::{get, post},
+    routing::{get, post, put},
 };
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -78,6 +78,14 @@ pub fn create_router(state: AppState) -> Router {
             "/xrpc/app.bsky.actor.getSuggestions",
             get(actor::get_suggestions),
         )
+        .route(
+            "/xrpc/app.bsky.actor.getPreferences",
+            get(actor::get_preferences),
+        )
+        .route(
+            "/xrpc/app.bsky.actor.putPreferences",
+            put(actor::put_preferences),
+        )
         .route("/xrpc/app.bsky.feed.getTimeline", get(feed::get_timeline))
         .route(
             "/xrpc/app.bsky.feed.getAuthorFeed",
@@ -102,6 +110,7 @@ pub fn create_router(state: AppState) -> Router {
             "/xrpc/app.bsky.feed.getRepostedBy",
             get(feed::get_reposted_by),
         )
+        .route("/xrpc/app.bsky.feed.getListFeed", get(feed::get_list_feed))
         .route("/xrpc/app.bsky.feed.searchPosts", get(feed::search_posts))
         .route("/xrpc/app.bsky.graph.getFollows", get(graph::get_follows))
         .route(

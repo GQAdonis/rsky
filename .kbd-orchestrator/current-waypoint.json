@@ -3,34 +3,23 @@
   "phase_status": "IN_PROGRESS",
   "backend": "openspec",
   "last_completed_phase": "phase-4-pds-hardening",
-  "last_completed_change": null,
-  "next_pending_change": "prod-c001",
-  "next_pending_note": "Fix relay CrashLoopBackOff — delete PVC, restart relay",
+  "last_completed_change": "prod-c018",
+  "next_pending_change": "prod-c011",
+  "next_pending_note": "Prometheus ServiceMonitors for relay and appview (GAP-9)",
   "last_updated_by": "claude-code",
-  "last_updated": "2026-05-05T00:00:00Z",
-  "preferred_re_entry_skill": "kbd-plan",
-  "exact_next_command": "/opsx:apply prod-c001",
+  "last_updated": "2026-05-05T23:00:00Z",
+  "preferred_re_entry_skill": "kbd-execute",
+  "exact_next_command": "/opsx:apply prod-c011",
   "fallback_command": "/kbd-status",
-  "phase_4_seed": {
-    "source": "phase-3-reflection",
-    "high_priority": [
-      "DPoP binding enforcement (cnf.jkt validation in auth_verifier OAuth path)",
-      "Actor store RLS tighten: wire SET LOCAL app.current_did at call sites, change to RESTRICTIVE policies",
-      "Conformance harness CI integration (GitHub Actions job for run-conformance.sh)"
-    ],
-    "medium_priority": [
-      "Dedicated OAuth signing key pair (separate from session JWT key)",
-      "Background jobs sweep: token cleanup, email-token GC, blob GC",
-      "Mailer template parity audit (15 templates vs upstream)"
-    ],
-    "low_priority": [
-      "rsky-lexicon codegen evaluation",
-      "Fix unused Redirect import in oauth/authorize.rs"
-    ],
-    "live_verification_prerequisites": [
-      "Relay soak test (sync v1.1 strict relay, 24h)",
-      "OAuth end-to-end with Bluesky web client against pds.know-me.tools",
-      "Conformance harness CAR byte equivalence run"
-    ]
+  "completed_this_session": [
+    "prod-c015: ES256K JWT support in appview-auth (login unblocked)",
+    "prod-c016: getPreferences/putPreferences/getListFeed stub routes",
+    "prod-c017: record field hydration in postView (post text now visible)",
+    "prod-c018: feedgen CreateRecord repost+unknown variant (crashloop fixed)"
+  ],
+  "deploy_needed": {
+    "rsky-appview": "all 4 changes require new appview image build+deploy",
+    "rsky-feedgen": "prod-c018 requires new feedgen image build+deploy",
+    "trigger": "workflow_dispatch on .github/workflows/deploy.yml"
   }
 }

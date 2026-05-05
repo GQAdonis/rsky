@@ -4,7 +4,8 @@ use axum::{
     extract::FromRequestParts,
     http::{StatusCode, request::Parts},
 };
-use jsonwebtoken::{DecodingKey, Validation, decode};
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,16 +26,35 @@ pub struct Viewer {
 #[derive(Debug, Clone)]
 pub struct OptionalViewer(pub Option<Viewer>);
 
+/// Decode and validate a JWT without verifying its signature.
+///
+/// AT Protocol appviews trust PDS-issued tokens by DID key resolution rather
+/// than shared secrets, so signature validation is intentionally skipped.
+/// We parse the payload directly to avoid `jsonwebtoken`'s algorithm enum
+/// check, which rejects ES256K (secp256k1) tokens issued by rsky-pds.
 pub fn decode_token(token: &str) -> Result<Claims> {
-    let mut validation = Validation::default();
-    validation.insecure_disable_signature_validation();
-    validation.validate_exp = true;
-    validation.validate_nbf = false;
+    let parts: Vec<&str> = token.splitn(3, '.').collect();
+    if parts.len() != 3 {
+        return Err(AppViewError::Auth("malformed JWT: expected 3 segments".into()));
+    }
 
-    let token_data = decode::<Claims>(token, &DecodingKey::from_secret(&[]), &validation)
-        .map_err(|e| AppViewError::Auth(format!("Invalid token: {}", e)))?;
+    let payload_bytes = URL_SAFE_NO_PAD
+        .decode(parts[1])
+        .map_err(|_| AppViewError::Auth("malformed JWT: invalid base64url payload".into()))?;
 
-    Ok(token_data.claims)
+    let claims: Claims = serde_json::from_slice(&payload_bytes)
+        .map_err(|e| AppViewError::Auth(format!("malformed JWT payload: {e}")))?;
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+
+    if claims.exp < now {
+        return Err(AppViewError::Auth("token expired".into()));
+    }
+
+    Ok(claims)
 }
 
 fn extract_bearer_token(parts: &Parts) -> Option<String> {
@@ -99,39 +119,61 @@ mod tests {
     use super::*;
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
-    use jsonwebtoken::{EncodingKey, Header, encode};
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    use base64::Engine;
     use tower::ServiceExt;
 
-    fn mint_token(sub: &str, exp_seconds: i64) -> String {
-        let now = chrono::Utc::now().timestamp();
-        let claims = Claims {
-            sub: sub.to_string(),
-            iat: now,
-            exp: now + exp_seconds,
-            scope: String::new(),
-        };
-        encode(
-            &Header::default(),
-            &claims,
-            &EncodingKey::from_secret(b"test"),
-        )
-        .expect("mint token")
+    fn make_jwt(header_alg: &str, sub: &str, exp_offset: i64) -> String {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        let header = serde_json::json!({ "alg": header_alg, "typ": "JWT" });
+        let payload = serde_json::json!({
+            "sub": sub,
+            "iat": now,
+            "exp": now + exp_offset,
+        });
+
+        let h = URL_SAFE_NO_PAD.encode(header.to_string().as_bytes());
+        let p = URL_SAFE_NO_PAD.encode(payload.to_string().as_bytes());
+        // Signature segment is fake — we skip validation intentionally
+        format!("{h}.{p}.fakesig")
     }
 
-    fn mint_expired_token(sub: &str) -> String {
-        let now = chrono::Utc::now().timestamp();
-        let claims = Claims {
-            sub: sub.to_string(),
-            iat: now - 200,
-            exp: now - 100,
-            scope: String::new(),
-        };
-        encode(
-            &Header::default(),
-            &claims,
-            &EncodingKey::from_secret(b"test"),
-        )
-        .expect("mint expired token")
+    #[test]
+    fn accepts_es256k_token() {
+        let token = make_jwt("ES256K", "did:plc:abc123", 3600);
+        let claims = decode_token(&token).expect("should accept ES256K token");
+        assert_eq!(claims.sub, "did:plc:abc123");
+    }
+
+    #[test]
+    fn accepts_hs256_token() {
+        let token = make_jwt("HS256", "did:plc:abc123", 3600);
+        let claims = decode_token(&token).expect("should accept HS256 token");
+        assert_eq!(claims.sub, "did:plc:abc123");
+    }
+
+    #[test]
+    fn rejects_expired_token() {
+        let token = make_jwt("ES256K", "did:plc:abc123", -100);
+        let result = decode_token(&token);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("expired"));
+    }
+
+    #[test]
+    fn rejects_malformed_token() {
+        let result = decode_token("not.a.real.token");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn rejects_one_segment_token() {
+        let result = decode_token("onlyone");
+        assert!(result.is_err());
     }
 
     #[tokio::test]
@@ -147,7 +189,7 @@ mod tests {
 
     #[tokio::test]
     async fn viewer_rejects_expired_token() {
-        let token = mint_expired_token("did:web:example.com");
+        let token = make_jwt("ES256K", "did:web:example.com", -100);
         let app = axum::Router::new().route(
             "/test",
             axum::routing::get(|viewer: Viewer| async move { viewer.did.to_string() }),
@@ -162,8 +204,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn viewer_accepts_valid_token() {
-        let token = mint_token("did:plc:abc123", 3600);
+    async fn viewer_accepts_es256k_token() {
+        let token = make_jwt("ES256K", "did:plc:abc123", 3600);
         let app = axum::Router::new().route(
             "/test",
             axum::routing::get(|viewer: Viewer| async move { viewer.did.to_string() }),
@@ -210,8 +252,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn optional_viewer_returns_some_with_valid_token() {
-        let token = mint_token("did:plc:xyz789", 3600);
+    async fn optional_viewer_returns_some_with_es256k_token() {
+        let token = make_jwt("ES256K", "did:plc:xyz789", 3600);
         let app = axum::Router::new().route(
             "/test",
             axum::routing::get(|viewer: OptionalViewer| async move {

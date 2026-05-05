@@ -4,8 +4,8 @@ use appview_db as db;
 use appview_lexicon::bsky::actor::ProfileViewBasic;
 use appview_lexicon::bsky::feed::{
     AuthorFeedOutput, FeedViewPost, GeneratorView, GetFeedGeneratorOutput, GetFeedGeneratorsOutput,
-    GetLikesOutput, GetRepostedByOutput, LikeView, PostThreadOutput, PostView, SearchPostsOutput,
-    TimelineOutput,
+    GetLikesOutput, GetListFeedOutput, GetRepostedByOutput, LikeView, PostThreadOutput, PostView,
+    SearchPostsOutput, TimelineOutput,
 };
 use axum::{
     Json,
@@ -43,7 +43,11 @@ fn post_view_with_author(row: &db::models::PostWithAuthorRow) -> PostView {
             row.author_display_name.clone(),
             row.author_avatar_cid.clone(),
         ),
-        record: serde_json::Value::Object(serde_json::Map::new()),
+        record: serde_json::json!({
+            "$type": "app.bsky.feed.post",
+            "text": row.text,
+            "createdAt": row.created_at,
+        }),
         embed: None,
         reply_count: row.reply_count,
         repost_count: row.repost_count,
@@ -62,7 +66,11 @@ fn post_view_plain(row: &db::models::PostRow) -> PostView {
         uri: row.uri.clone(),
         cid: row.cid.clone(),
         author: build_profile_basic(row.creator.clone(), None, None, None),
-        record: serde_json::Value::Object(serde_json::Map::new()),
+        record: serde_json::json!({
+            "$type": "app.bsky.feed.post",
+            "text": row.text,
+            "createdAt": row.created_at,
+        }),
         embed: None,
         reply_count: row.reply_count,
         repost_count: row.repost_count,
@@ -355,4 +363,24 @@ pub async fn get_feed_generators(
     Query(_params): Query<GetFeedGeneratorsParams>,
 ) -> Result<Json<GetFeedGeneratorsOutput>> {
     Ok(Json(GetFeedGeneratorsOutput { feeds: vec![] }))
+}
+
+#[derive(Deserialize)]
+pub struct GetListFeedParams {
+    #[serde(rename = "list")]
+    _list: String,
+    #[serde(default)]
+    _limit: Option<i64>,
+    #[serde(default)]
+    _cursor: Option<String>,
+}
+
+pub async fn get_list_feed(
+    State(_state): State<AppState>,
+    Query(_params): Query<GetListFeedParams>,
+) -> Result<Json<GetListFeedOutput>> {
+    Ok(Json(GetListFeedOutput {
+        feed: vec![],
+        cursor: None,
+    }))
 }

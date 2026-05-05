@@ -2,12 +2,13 @@ use crate::{AppState, AppViewError};
 use appview_core::error::Result;
 use appview_db as db;
 use appview_lexicon::bsky::actor::{
-    GetProfileOutput, GetProfilesOutput, GetSuggestionsOutput, ProfileView, ProfileViewBasic,
-    ProfileViewDetailed, SearchActorsOutput, SearchActorsTypeaheadOutput,
+    GetPreferencesOutput, GetProfileOutput, GetProfilesOutput, GetSuggestionsOutput, ProfileView,
+    ProfileViewBasic, ProfileViewDetailed, SearchActorsOutput, SearchActorsTypeaheadOutput,
 };
 use axum::{
     Json,
     extract::{Query, State},
+    http::StatusCode,
 };
 use serde::Deserialize;
 
@@ -197,4 +198,17 @@ pub async fn get_suggestions(
         actors,
         cursor: None,
     }))
+}
+
+pub async fn get_preferences(
+    State(_state): State<AppState>,
+) -> Result<Json<GetPreferencesOutput>> {
+    Ok(Json(GetPreferencesOutput { preferences: vec![] }))
+}
+
+pub async fn put_preferences(
+    State(_state): State<AppState>,
+    Json(_body): Json<serde_json::Value>,
+) -> StatusCode {
+    StatusCode::OK
 }
