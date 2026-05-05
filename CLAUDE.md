@@ -179,3 +179,39 @@ Docker images are published to `ghcr.io/blacksky-algorithms`.
 - Do not submit large refactors or new external dependencies without discussion first.
 - PRs should be scoped; separate library changes from service changes when practical.
 - AT Protocol fundamentals are documented at `atproto.com` — understand PDS, Relay, and AppView concepts before making protocol changes.
+
+## Memory Protocol (Surreal Memory MCP)
+
+Before attempting any fix, search project memory:
+```
+mcp: search_memories({ query: "<symptom>", namespace: "rsky" })
+```
+
+After resolving any bug, log it immediately:
+```
+mcp: add_memory({
+  content: "Fixed: <symptom>. Root cause: <cause>. Fix: <what changed>. Files: <paths>.",
+  namespace: "rsky",
+  tags: ["bug-fix", "<component>"]
+})
+```
+
+This is mandatory. It prevents re-solving the same problems across sessions.
+
+## Karpathy Continuous Wiki Protocol
+
+After completing each change or phase:
+1. Write a wiki entry to surreal-memory:
+   ```
+   add_memory({ content: "Wiki: <component>. What worked: ... What surprised: ... Watch for: ...", namespace: "rsky", tags: ["wiki", "<component>"] })
+   ```
+2. Update CLAUDE.md with any new "gotchas" discovered
+3. Cross-reference from AGENTS.md
+
+## Known Gotchas (maintained continuously)
+
+| Issue | Root Cause | Fix | Logged |
+|-------|-----------|-----|--------|
+| relay CrashLoopBackOff (xShmMap) | GKE SSD PVC incompatible with SQLite WAL shared-memory | Delete PVC, relay re-syncs | prod-c001 |
+| web client Server Components error | NEXTAUTH_URL missing from k8s configmap | Add to configmap.yaml, rollout restart | 2026-05-04 |
+| Vercel analytics 404s | @vercel/analytics loaded on self-hosted deploy | Remove from layout.tsx, rebuild image | 2026-05-04 |

@@ -297,3 +297,28 @@ Primary workflows:
 - Service-specific Docker workflows exist for PDS, relay, feedgen, labeler, jetstream subscriber, and pdsadmin.
 
 When practical, mirror CI locally with the narrowest command that covers the touched area.
+
+### 4. Memory-First Debugging
+
+Before any investigation:
+1. Run: `search_memories({ query: "<error message or symptom>", namespace: "rsky" })`
+2. If a prior fix is found, apply it directly — do not re-investigate
+3. If no prior fix: investigate, fix, then log to surreal-memory
+
+After any fix:
+1. Run: `add_memory({ content: "...", namespace: "rsky", tags: ["bug-fix", "<crate>"] })`
+2. Update the "Known Gotchas" table in CLAUDE.md
+
+### 5. Karpathy Continuous Improvement
+
+After each meaningful change:
+- Write what worked and what didn't to surreal-memory (namespace: rsky, tag: wiki)
+- Update CLAUDE.md Known Gotchas table
+- Reference the openspec change ID (e.g., prod-c001) for traceability
+
+### 6. Web Search Before Custom Implementation
+
+Before implementing any AT Protocol feature from scratch:
+1. Use Tavily (`mcp__tavily-mcp__tavily_search`) to find current reference implementation
+2. Check `atproto.com/docs` and `github.com/bluesky-social/atproto` for spec
+3. Only implement custom after validating no upstream library covers it
