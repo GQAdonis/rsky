@@ -122,7 +122,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/rsky-pds
           tags: |
-            type=sha,prefix=,format=short
+            type=sha,prefix=,format=short,priority=1000
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v5
@@ -156,7 +156,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/rsky-relay
           tags: |
-            type=sha,prefix=,format=short
+            type=sha,prefix=,format=short,priority=1000
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v5
@@ -190,7 +190,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/rsky-feedgen
           tags: |
-            type=sha,prefix=,format=short
+            type=sha,prefix=,format=short,priority=1000
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v5
@@ -224,7 +224,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/rsky-labeler
           tags: |
-            type=sha,prefix=,format=short
+            type=sha,prefix=,format=short,priority=1000
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v5
@@ -258,7 +258,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/rsky-jetstream-subscriber
           tags: |
-            type=sha,prefix=,format=short
+            type=sha,prefix=,format=short,priority=1000
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v5
@@ -292,7 +292,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/rsky-wintermute
           tags: |
-            type=sha,prefix=,format=short
+            type=sha,prefix=,format=short,priority=1000
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v5
@@ -326,7 +326,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/rsky-appview
           tags: |
-            type=sha,prefix=,format=short
+            type=sha,prefix=,format=short,priority=1000
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v5
@@ -360,7 +360,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/web-client
           tags: |
-            type=sha,prefix=,format=short
+            type=sha,prefix=,format=short,priority=1000
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v5
