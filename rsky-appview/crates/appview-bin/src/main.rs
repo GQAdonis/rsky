@@ -39,8 +39,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .install_recorder()
         .expect("failed to install Prometheus recorder");
 
+    let queue_path = std::env::var("QUEUE_PATH")
+        .unwrap_or_else(|_| "/data/appview-queue".to_string());
     let queue = Arc::new(IndexQueue::new(Some(std::path::PathBuf::from(
-        "/tmp/appview-queue",
+        queue_path,
     )))?);
     let state = Arc::new(AppStateInner::new(&database_url).await?);
 
