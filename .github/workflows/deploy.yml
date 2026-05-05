@@ -570,7 +570,7 @@ jobs:
       # ── rsky-appview ──────────────────────────────────────────────────────
       - name: Apply rsky-appview manifests
         run: |
-          kubectl apply -f k8s/clusterissuer.yaml
+          kubectl apply --server-side --force-conflicts -f k8s/clusterissuer.yaml
           kubectl apply -f k8s/rsky-appview/service.yaml
           kubectl apply -f k8s/rsky-appview/gateway.yaml
           kubectl apply -f k8s/rsky-appview/certificate.yaml

@@ -89,3 +89,13 @@ spec:
       selector:
         dnsNames:
         - appview.know-me.tools
+    - http01:
+        gatewayHTTPRoute:
+          parentRefs:
+          - group: gateway.networking.k8s.io
+            kind: Gateway
+            name: pds-gateway
+            namespace: atproto
+      selector:
+        dnsNames:
+        - alice.know-me.tools
