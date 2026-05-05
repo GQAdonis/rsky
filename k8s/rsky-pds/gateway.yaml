@@ -19,3 +19,9 @@ spec:
       protocol: HTTP
       port: 80
       hostname: pds.know-me.tools
+    # handles-https and handles-http listeners for *.know-me.tools are defined
+    # here but require:
+    # 1. Cloudflare DNS wildcard A record: *.know-me.tools → 35.238.217.92
+    # 2. wildcard-know-me-tools-tls cert via DNS-01 challenge (Cloudflare API token)
+    # Until both are configured, handle resolution uses DNS TXT per-user records.
+    # See k8s/rsky-pds/README-handles.md for setup instructions.
