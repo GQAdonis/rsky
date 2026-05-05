@@ -10,3 +10,16 @@ spec:
     kind: ClusterIssuer
   dnsNames:
     - pds.know-me.tools
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: handles-know-me-tools-tls
+  namespace: atproto
+spec:
+  secretName: handles-know-me-tools-tls
+  issuerRef:
+    name: letsencrypt
+    kind: ClusterIssuer
+  dnsNames:
+    - alice.know-me.tools

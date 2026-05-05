@@ -109,6 +109,11 @@ impl FirehoseConsumer {
         // Use AtomicI64 for cheap, lock-free cursor updates
         let last_seq = Arc::new(AtomicI64::new(cursor.unwrap_or(0)));
 
+        let ws_scheme = if hostname.starts_with("ws://") || hostname.starts_with("http://") {
+            "ws"
+        } else {
+            "wss"
+        };
         let clean_hostname = hostname
             .trim_start_matches("wss://")
             .trim_start_matches("ws://")
@@ -119,9 +124,9 @@ impl FirehoseConsumer {
         // If the caller already provided the full XRPC path, use it directly;
         // otherwise append the subscribeRepos path.
         let full_url = if clean_hostname.contains("/xrpc/") {
-            format!("wss://{clean_hostname}")
+            format!("{ws_scheme}://{clean_hostname}")
         } else {
-            format!("wss://{clean_hostname}/xrpc/com.atproto.sync.subscribeRepos")
+            format!("{ws_scheme}://{clean_hostname}/xrpc/com.atproto.sync.subscribeRepos")
         };
 
         let mut url = match url::Url::parse(&full_url) {

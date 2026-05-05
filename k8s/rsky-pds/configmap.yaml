@@ -12,6 +12,7 @@ data:
   PDS_CRAWLERS: "https://bsky.network"
   ROCKET_PORT: "3000"
   ROCKET_ADDRESS: "0.0.0.0"
+  ROCKET_WORKERS: "32"
   AWS_ENDPOINT_URL: "https://storage.googleapis.com"
   AWS_DEFAULT_REGION: "auto"
   PDS_INVITE_REQUIRED: "false"

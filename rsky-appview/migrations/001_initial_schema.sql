@@ -42,6 +42,14 @@ CREATE TABLE IF NOT EXISTS post (
     "indexedAt"   TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS post_agg (
+    uri           TEXT PRIMARY KEY REFERENCES post(uri) ON DELETE CASCADE,
+    "replyCount"  BIGINT NOT NULL DEFAULT 0,
+    "repostCount" BIGINT NOT NULL DEFAULT 0,
+    "likeCount"   BIGINT NOT NULL DEFAULT 0,
+    "quoteCount"  BIGINT NOT NULL DEFAULT 0
+);
+
 CREATE INDEX IF NOT EXISTS post_creator_idx ON post (creator, "indexedAt" DESC);
 CREATE INDEX IF NOT EXISTS post_reply_parent_idx ON post ("replyParent");
 
