@@ -294,6 +294,7 @@ async fn index_post(
     if let Some(ref parent_uri) = reply_parent {
         let parent_creator = extract_did_from_at_uri(parent_uri);
         if parent_creator != repo {
+            ensure_actor(parent_creator, pool).await?;
             sqlx::query(
                 r#"INSERT INTO notification (did, author, "recordUri", "recordCid", reason, "reasonSubject", "isRead", "sortAt")
                    VALUES ($1, $2, $3, $4, 'reply', $5, false, $6)
@@ -325,6 +326,7 @@ async fn index_like(
         debug!("skipping like with no record data: {uri}");
         return Ok(());
     };
+    ensure_actor(repo, pool).await?;
 
     let subject_uri = rec
         .get("subject")
@@ -351,7 +353,7 @@ async fn index_like(
     }
 
     sqlx::query(
-        r#"INSERT INTO like (uri, creator, subject, "subjectCid", "createdAt", "indexedAt")
+        r#"INSERT INTO "like" (uri, creator, subject, "subjectCid", "createdAt", "indexedAt")
            VALUES ($1, $2, $3, $4, $5, $6)
            ON CONFLICT (uri) DO UPDATE SET subject = EXCLUDED.subject,
              "subjectCid" = EXCLUDED."subjectCid", "indexedAt" = EXCLUDED."indexedAt""#,
@@ -368,6 +370,7 @@ async fn index_like(
 
     let post_creator = extract_did_from_at_uri(&subject_uri);
     if post_creator != repo {
+        ensure_actor(post_creator, pool).await?;
         sqlx::query(
             r#"INSERT INTO notification (did, author, "recordUri", "recordCid", reason, "reasonSubject", "isRead", "sortAt")
                VALUES ($1, $2, $3, $4, 'like', $5, false, $6)
@@ -398,6 +401,7 @@ async fn index_repost(
         debug!("skipping repost with no record data: {uri}");
         return Ok(());
     };
+    ensure_actor(repo, pool).await?;
 
     let subject_uri = rec
         .get("subject")
@@ -433,6 +437,7 @@ async fn index_repost(
 
     let post_creator = extract_did_from_at_uri(&subject_uri);
     if post_creator != repo {
+        ensure_actor(post_creator, pool).await?;
         sqlx::query(
             r#"INSERT INTO notification (did, author, "recordUri", "recordCid", reason, "reasonSubject", "isRead", "sortAt")
                VALUES ($1, $2, $3, '', 'repost', $4, false, $5)
@@ -462,6 +467,7 @@ async fn index_follow(
         debug!("skipping follow with no record data: {uri}");
         return Ok(());
     };
+    ensure_actor(repo, pool).await?;
 
     let subject_did = rec
         .get("subject")
@@ -479,6 +485,8 @@ async fn index_follow(
         debug!("skipping follow with empty subject: {uri}");
         return Ok(());
     }
+
+    ensure_actor(&subject_did, pool).await?;
 
     sqlx::query(
         r#"INSERT INTO follow (uri, creator, "subjectDid", "createdAt", "indexedAt")
@@ -520,6 +528,7 @@ async fn index_block(
         debug!("skipping block with no record data: {uri}");
         return Ok(());
     };
+    ensure_actor(repo, pool).await?;
 
     let subject_did = rec
         .get("subject")
@@ -622,7 +631,7 @@ async fn delete_post(uri: &str, repo: &str, pool: &PgPool) -> Result<()> {
 }
 
 async fn delete_like(uri: &str, pool: &PgPool) -> Result<()> {
-    sqlx::query("DELETE FROM like WHERE uri = $1")
+    sqlx::query(r#"DELETE FROM "like" WHERE uri = $1"#)
         .bind(uri)
         .execute(pool)
         .await
