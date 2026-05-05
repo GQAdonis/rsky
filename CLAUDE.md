@@ -215,3 +215,10 @@ After completing each change or phase:
 | relay CrashLoopBackOff (xShmMap) | GKE SSD PVC incompatible with SQLite WAL shared-memory | Delete PVC, relay re-syncs | prod-c001 |
 | web client Server Components error | NEXTAUTH_URL missing from k8s configmap | Add to configmap.yaml, rollout restart | 2026-05-04 |
 | Vercel analytics 404s | @vercel/analytics loaded on self-hosted deploy | Remove from layout.tsx, rebuild image | 2026-05-04 |
+| appview 404 on XRPC routes | wintermute HTTPRoute (older creation time) won Gateway API precedence over appview route on same hostname | Delete wintermute gateway/httproute files from cluster and repo | prod-c002 |
+| PDS kubectl apply causes ImagePullBackOff | statefulset.yaml contains IMAGE_TAG placeholder; direct apply uses literal string | Use kubectl patch for resource-only changes, never kubectl apply statefulset | 2026-05-05 |
+| PDS OOMKilled/liveness fail under relay crawl | Rocket 0.5 default ~4 workers saturated by relay WS connections | Set ROCKET_WORKERS=32; relax probe (60s period, 15s timeout, 5 failures) | prod-c005 |
+| appview wss:// forced despite ws:// config | appview-firehose hardcodes wss:// scheme regardless of input | Fix: preserve scheme from RELAY_HOSTS input (ws:// → ws://) | prod-c007 |
+| appview InternalServerError on getTimeline | post_agg table missing from migration (profile_agg existed, post_agg did not) | Add post_agg to 001_initial_schema.sql; apply directly to Postgres | prod-c007 |
+| deploy "no objects passed to apply" | k8s secret file deleted from repo but still referenced in deploy.yml | Recreate the secret file (minimal) or remove from deploy.yml | 2026-05-05 |
+| appview relay connection timeout via gateway | Envoy Gateway 300s idle timeout kills long-lived WS; external URL adds gateway hop | Use internal cluster URL ws://rsky-relay:9000 instead of wss://relay.know-me.tools | prod-c007 |
