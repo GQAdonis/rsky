@@ -10,7 +10,11 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
+    /// User tokens use `sub`; service-auth tokens (PDS→appview) use `iss`.
+    #[serde(default)]
     pub sub: String,
+    #[serde(default)]
+    pub iss: String,
     pub iat: i64,
     pub exp: i64,
     #[serde(default)]
@@ -42,8 +46,17 @@ pub fn decode_token(token: &str) -> Result<Claims> {
         .decode(parts[1])
         .map_err(|_| AppViewError::Auth("malformed JWT: invalid base64url payload".into()))?;
 
-    let claims: Claims = serde_json::from_slice(&payload_bytes)
+    let mut claims: Claims = serde_json::from_slice(&payload_bytes)
         .map_err(|e| AppViewError::Auth(format!("malformed JWT payload: {e}")))?;
+
+    // Service-auth tokens (PDS → appview) carry the requester DID in `iss`, not `sub`.
+    if claims.sub.is_empty() && !claims.iss.is_empty() {
+        claims.sub = claims.iss.clone();
+    }
+
+    if claims.sub.is_empty() {
+        return Err(AppViewError::Auth("JWT missing both sub and iss".into()));
+    }
 
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

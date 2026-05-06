@@ -138,6 +138,11 @@ CREATE TABLE IF NOT EXISTS feed_generator (
     "indexedAt"  TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS feed_generator_agg (
+    uri          TEXT PRIMARY KEY REFERENCES feed_generator(uri) ON DELETE CASCADE,
+    "likeCount"  BIGINT NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS list (
     uri         TEXT PRIMARY KEY,
     cid         TEXT NOT NULL,
