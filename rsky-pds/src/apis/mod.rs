@@ -2,6 +2,7 @@ use crate::auth_verifier::AccessStandard;
 use crate::handle;
 use crate::handle::errors::ErrorKind;
 use crate::pipethrough::{pipethrough_procedure, pipethrough_procedure_post, ProxyRequest};
+use crate::xrpc_server::types::{InvalidRequestError, XRPCError};
 use anyhow::{Error, Result};
 use rocket::http::{ContentType, Header, Status};
 use rocket::request::FromParam;
@@ -59,8 +60,21 @@ pub async fn bsky_api_get_forwarder(
             Ok(ProxyResponder(res.buffer, content_length, content_type))
         }
         Err(error) => {
-            tracing::error!("@LOG: ERROR: {error}");
-            Err(ApiError::RuntimeError)
+            tracing::error!("@LOG: bsky_api_get_forwarder upstream error: {error}");
+            match error.downcast_ref::<InvalidRequestError>() {
+                Some(InvalidRequestError::XRPCError(XRPCError::FailedResponse {
+                    error: err,
+                    message,
+                    ..
+                })) => {
+                    let err_name = err.clone().unwrap_or_else(|| "UpstreamError".into());
+                    let msg = message
+                        .clone()
+                        .unwrap_or_else(|| "Upstream request failed".into());
+                    Err(ApiError::BadRequest(err_name, msg))
+                }
+                _ => Err(ApiError::RuntimeError),
+            }
         }
     }
 }

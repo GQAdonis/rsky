@@ -11,7 +11,7 @@ pub async fn list_notifications(
     let rows = sqlx::query_as::<_, NotificationRow>(
         r#"
         SELECT
-            n.uri, n.did, n.author,
+            n.did, n.author,
             n."recordUri" AS record_uri, n."recordCid" AS record_cid,
             n.reason, n."reasonSubject" AS reason_subject,
             n."isRead" AS is_read, n."sortAt" AS sort_at

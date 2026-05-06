@@ -97,7 +97,6 @@ pub struct FollowRow {
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct NotificationRow {
-    pub uri: Option<String>,
     pub did: String,
     pub author: String,
     pub record_uri: String,
