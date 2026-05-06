@@ -5,7 +5,7 @@ use crate::models;
 use anyhow::Result;
 use diesel::*;
 use jwt_simple::prelude::*;
-use rsky_common::time::{from_micros_to_utc, MINUTE};
+use rsky_common::time::{from_micros_to_utc, from_millis_to_utc, MINUTE};
 use rsky_common::{get_random_str, json_to_b64url, RFC3339_VARIANT};
 use secp256k1::Message;
 use sha2::{Digest, Sha256};
@@ -209,7 +209,7 @@ pub async fn store_refresh_token(
 ) -> Result<()> {
     use crate::schema::pds::refresh_token::dsl as RefreshTokenSchema;
 
-    let exp = from_micros_to_utc((payload.exp.as_millis() / 1000) as i64);
+    let exp = from_millis_to_utc(payload.exp.as_millis() as i64);
 
     db.run(move |conn| {
         insert_into(RefreshTokenSchema::refresh_token)
