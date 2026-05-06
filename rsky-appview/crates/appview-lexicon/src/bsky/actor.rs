@@ -145,10 +145,8 @@ pub struct ViewerState {
 
 // --- Response envelopes ---
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GetProfileOutput {
-    pub profile: ProfileViewDetailed,
-}
+// app.bsky.actor.getProfile returns ProfileViewDetailed fields directly (no wrapper key)
+pub type GetProfileOutput = ProfileViewDetailed;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetProfilesOutput {

@@ -46,7 +46,7 @@ pub async fn get_profile(
         labels: None,
     };
 
-    Ok(Json(GetProfileOutput { profile }))
+    Ok(Json(profile))
 }
 
 #[derive(Deserialize)]
