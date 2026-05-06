@@ -48,10 +48,9 @@ pub fn from_str_to_utc(str: &str) -> Result<DateTime<UtcOffset>> {
         .map_err(|e| anyhow!("failed to parse datetime {:?}: {}", str, e))
 }
 
-#[allow(deprecated)]
 pub fn from_micros_to_utc(micros: i64) -> DateTime<UtcOffset> {
-    let nanoseconds = 230 * 1000000;
-    DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(micros, nanoseconds), Utc)
+    DateTime::from_timestamp_micros(micros)
+        .unwrap_or_else(|| DateTime::UNIX_EPOCH)
 }
 
 pub fn from_micros_to_str(micros: i64) -> String {
@@ -59,7 +58,8 @@ pub fn from_micros_to_str(micros: i64) -> String {
 }
 
 pub fn from_millis_to_utc(millis: i64) -> DateTime<UtcOffset> {
-    DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp_millis(millis).unwrap(), Utc)
+    DateTime::from_timestamp_millis(millis)
+        .unwrap_or_else(|| DateTime::UNIX_EPOCH)
 }
 
 pub fn from_millis_to_str(millis: i64) -> String {
