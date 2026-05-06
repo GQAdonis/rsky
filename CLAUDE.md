@@ -180,6 +180,68 @@ Docker images are published to `ghcr.io/blacksky-algorithms`.
 - PRs should be scoped; separate library changes from service changes when practical.
 - AT Protocol fundamentals are documented at `atproto.com` — understand PDS, Relay, and AppView concepts before making protocol changes.
 
+## Rust Code Quality
+
+### Validation Command (run before every commit)
+
+```bash
+# Root workspace
+cargo clippy --workspace --all-targets --all-features --fix --allow-dirty
+
+# rsky-appview sub-workspace
+cd rsky-appview && cargo clippy --workspace --all-targets --all-features --fix --allow-dirty && cd ..
+
+# rsky-pdsadmin sub-workspace
+cd rsky-pdsadmin && cargo clippy --all-targets --all-features --fix --allow-dirty && cd ..
+```
+
+### Required Developer Tools
+
+Install once:
+
+```bash
+cargo install cargo-geiger
+cargo install cargo-modules
+cargo install cargo-call-stack
+cargo install cargo-udeps
+cargo install cargo-nextest --locked
+cargo install cargo-deny --locked
+cargo install cargo-audit --locked
+```
+
+- **cargo-geiger**: Maps unsafe usage across the dependency tree
+- **cargo-modules**: Visualizes module structure and call graph
+- **cargo-call-stack**: Static call graph analysis
+- **cargo-udeps**: Finds unused dependencies
+- **cargo-nextest**: Faster, structured test runner (replaces `cargo test` in CI)
+- **cargo-deny**: License, advisory, and ban policy enforcement
+- **cargo-audit**: RustSec vulnerability database checks
+
+### Using rust-skills for Standards-Compliant Code
+
+Always invoke the `rust-skills` skill from actionbook before writing or reviewing Rust code:
+
+```
+Skill("rust-skills:m01-ownership")   # ownership/borrowing
+Skill("rust-skills:m06-error-handling")  # error handling
+Skill("rust-skills:m07-concurrency") # async/tokio patterns
+```
+
+Load the relevant skill for the module being changed and follow it.
+
+### Audit Loop Pattern
+
+Follow this cycle for all Rust changes:
+
+```
+Analyze → Patch → Re-run Clippy → Re-analyze → Benchmark → Continue
+```
+
+### Enterprise Audit Skill
+
+A full enterprise audit prompt is available at `.claude/skills/rust-enterprise-audit.md`.
+Load it when performing a deep review of any crate.
+
 ## Memory Protocol (Surreal Memory MCP)
 
 Before attempting any fix, search project memory:
@@ -237,3 +299,5 @@ After completing each change or phase:
 | appview getProfile returns {"profile":{...}} — client digest 3232795325 | GetProfileOutput struct wrapped ProfileViewDetailed in `profile` key; AT Protocol spec returns fields flat at root | Change GetProfileOutput to type alias: `pub type GetProfileOutput = ProfileViewDetailed`; handler returns `Json(profile)` | 2026-05-06 |
 | appview misses our PDS events — RELAY_HOSTS only had relay | Appview subscribes to relay which replays millions of public events before reaching our PDS seq | Add wss://pds.know-me.tools to RELAY_HOSTS in k8s/rsky-appview/secret.yaml (comma-separated); appview spawns independent cursor per host | 2026-05-06 |
 | kubectl secret patch overwritten by CI deploy | deploy.yml applies k8s manifests from repo, reverting any manual kubectl patch | Always edit the file in k8s/rsky-appview/secret.yaml and push to repo before patching cluster | 2026-05-06 |
+| refreshSession panics with "invalid or out-of-range datetime" | from_micros_to_utc() in rsky-common/src/time.rs passed microseconds to NaiveDateTime::from_timestamp() which expects seconds — overflow panicked chrono | Replace with DateTime::from_timestamp_micros(micros).unwrap_or_else(\|\| DateTime::UNIX_EPOCH). Breaks NextAuth JWT_SESSION_ERROR → web client crash on login | 2026-05-06 |
+| refreshSession returns ExpiredToken for brand-new tokens | store_refresh_token() in auth.rs called from_micros_to_utc((exp.as_millis() / 1000)) — passed seconds where micros expected; stored expiresAt as 1970-01-01T00:29:45Z | Change to from_millis_to_utc(exp.as_millis()) — exp.as_millis() is Unix ms timestamp, not a duration. Also delete corrupt rows: DELETE FROM pds.refresh_token WHERE "expiresAt" < '2025-01-01' | 2026-05-06 |
