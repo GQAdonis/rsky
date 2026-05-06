@@ -12,7 +12,8 @@ use tracing::{debug, error, info, warn};
 
 const FIREHOSE_PING_INTERVAL: Duration = Duration::from_secs(30);
 const CURSOR_SAVE_INTERVAL: Duration = Duration::from_secs(10);
-const IDLE_TIMEOUT: Duration = Duration::from_secs(30);
+// Allow 3 missed pongs before declaring connection dead; small PDSes have long gaps between events.
+const IDLE_TIMEOUT: Duration = Duration::from_secs(90);
 const MAX_CONCURRENT_JOBS: usize = 100;
 
 pub struct FirehoseConsumer {
@@ -244,8 +245,10 @@ impl FirehoseConsumer {
                 () = tokio::time::sleep(Duration::from_millis(100)) => continue,
             };
 
+            // Any message (including Pong) resets the idle timer.
+            last_message_time = std::time::Instant::now();
+
             if let Message::Binary(data) = msg {
-                last_message_time = std::time::Instant::now();
 
                 let queue_clone = Arc::clone(queue);
                 let semaphore_clone = Arc::clone(&semaphore);
