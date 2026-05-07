@@ -35,6 +35,12 @@ impl AppStateInner {
         let db = PgPool::connect(database_url)
             .await
             .map_err(|e| AppViewError::Storage(format!("failed to connect to db: {e}")))?;
+        Self::new_with_pool(db).await
+    }
+
+    /// Create AppStateInner from an already-constructed pool.
+    /// Use this to share a single pool instead of creating a second connection.
+    pub async fn new_with_pool(db: PgPool) -> Result<Self, AppViewError> {
         let did_resolver = DidResolver::new();
         let handle_resolver = HandleResolver::new(HandleResolverOpts {
             timeout: Some(std::time::Duration::from_secs(5)),

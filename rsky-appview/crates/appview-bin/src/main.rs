@@ -24,7 +24,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://localhost/appview".to_string());
-    let db = create_pool(&database_url, 32)
+    // Pool size: keep total connections well below pgbouncer pool_size=80.
+    // Each pool is per-process; 15 connections handles all appview workloads
+    // without exhausting the pgbouncer session-mode pool shared with PDS/feedgen.
+    let db = create_pool(&database_url, 15)
         .await
         .map_err(|e| AppViewError::Database(e.to_string()))?;
 
@@ -44,7 +47,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let queue = Arc::new(IndexQueue::new(Some(std::path::PathBuf::from(
         queue_path,
     )))?);
-    let state = Arc::new(AppStateInner::new(&database_url).await?);
+    // Reuse the shared pool instead of creating a second pool in AppStateInner.
+    let state = Arc::new(AppStateInner::new_with_pool(db.clone()).await?);
 
     // Firehose consumer — relay hosts from RELAY_HOSTS env var (comma-separated WSS URLs)
     // Falls back to the public Bluesky relay if not set.
