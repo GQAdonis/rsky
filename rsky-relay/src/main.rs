@@ -157,8 +157,13 @@ pub async fn main() -> Result<()> {
         validator_dead_clone.store(true, Ordering::Relaxed);
         result
     });
+    // Pass the current Tokio runtime Handle to the crawler so it can execute
+    // pool queries on the same runtime that created the PgPool. Using a separate
+    // new_current_thread runtime causes connection-acquisition timeouts because
+    // the pool's I/O driver runs on the main runtime, not the inner one.
+    let tokio_handle = tokio::runtime::Handle::current();
     let crawler =
-        CrawlerManager::new(WORKERS_CRAWLERS, &message_tx, request_crawl_rx, pool.clone())?;
+        CrawlerManager::new(WORKERS_CRAWLERS, &message_tx, request_crawl_rx, pool.clone(), tokio_handle)?;
     let publisher = PublisherManager::new(WORKERS_PUBLISHERS, subscribe_repos_rx)?;
     #[expect(clippy::vec_init_then_push)]
     let ret = thread::scope(move |s| {

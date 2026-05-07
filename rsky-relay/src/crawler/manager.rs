@@ -8,7 +8,7 @@ use hashbrown::{HashMap, HashSet};
 use magnetic::Consumer;
 use magnetic::buffer::dynamic::DynamicBufferP2;
 use thiserror::Error;
-use tokio::runtime::Runtime;
+use tokio::runtime::Handle;
 
 use crate::BAN_REFRESH_NEEDED;
 use crate::PgPool;
@@ -55,12 +55,12 @@ pub struct Manager {
     banned: HashSet<String>,
     last_ban_check: Instant,
     pool: PgPool,
-    /// Single-threaded Tokio runtime used to execute async DB queries from
-    /// this synchronous OS thread. The crawler manager runs on a regular
-    /// `thread::spawn` thread that has no Tokio context, so we can't use
-    /// `block_in_place` / `Handle::try_current`. A dedicated `Runtime` with
-    /// `block_on` is the correct bridge pattern.
-    rt: Runtime,
+    /// Handle to the main Tokio runtime used to execute async DB queries from
+    /// this synchronous OS thread. Using a Handle (not a new Runtime) ensures
+    /// the pool's I/O driver and background tasks run on the same runtime that
+    /// created the PgPool, preventing connection-acquisition timeouts that occur
+    /// when a pool is used from a different runtime's block_on.
+    rt: Handle,
     request_crawl_rx: RequestCrawlReceiver,
     status_rx: StatusReceiver,
 }
@@ -68,7 +68,7 @@ pub struct Manager {
 impl Manager {
     pub fn new(
         n_workers: usize, message_tx: &MessageSender, request_crawl_rx: RequestCrawlReceiver,
-        pool: PgPool,
+        pool: PgPool, rt: Handle,
     ) -> Result<Self, ManagerError> {
         #[expect(clippy::unwrap_used)]
         let (status_tx, status_rx) =
@@ -88,10 +88,6 @@ impl Manager {
         let banned = HashSet::new();
         let now = Instant::now();
         let last_ban_check = now.checked_sub(BAN_REFRESH_INTERVAL).unwrap_or(now);
-        // Build a minimal single-threaded runtime for executing async DB
-        // queries from this synchronous crawler-manager OS thread.
-        #[expect(clippy::unwrap_used)]
-        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
         Ok(Self {
             workers: workers.into_boxed_slice(),
             next_id: 0,
