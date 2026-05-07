@@ -164,24 +164,18 @@ fn write_response(stream: &mut ErrorOnDropTcpStream, status: &str, body: &str) -
     Ok(())
 }
 
-/// Execute an async sqlx future from synchronous code running on a Tokio blocking thread.
+/// Execute an async sqlx future from a blocking OS thread using a dedicated runtime.
 ///
 /// # Errors
 ///
-/// Returns [`sqlx::Error`] if the Tokio runtime is unavailable or the query fails.
-fn block_on_db<F, T>(fut: F) -> Result<T, sqlx::Error>
+/// Returns [`sqlx::Error`] if the query fails.
+fn block_on_db<F, T>(rt: &tokio::runtime::Runtime, fut: F) -> Result<T, sqlx::Error>
 where
     F: std::future::Future<Output = Result<T, sqlx::Error>> + Send,
 {
-    tokio::task::block_in_place(|| {
-        let handle = tokio::runtime::Handle::try_current().map_err(|e| {
-            sqlx::Error::Protocol(format!("no tokio runtime in server block_on_db: {e}"))
-        })?;
-        handle.block_on(fut)
-    })
+    rt.block_on(fut)
 }
 
-#[derive(Debug)]
 pub struct Server {
     listener: TcpListener,
     tls_config: Option<Arc<ServerConfig>>,
@@ -191,6 +185,9 @@ pub struct Server {
     pool: PgPool,
     request_crawl_tx: RequestCrawlSender,
     subscribe_repos_tx: SubscribeReposSender,
+    /// Dedicated single-threaded Tokio runtime for DB queries issued from
+    /// the blocking OS thread that runs the server accept loop.
+    rt: tokio::runtime::Runtime,
 }
 
 impl Server {
@@ -218,6 +215,10 @@ impl Server {
         let base_url = Url::parse("http://example.com")?;
         let now = Instant::now();
         let last = now.checked_sub(HOSTS_INTERVAL).unwrap_or(now);
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|e| ServerError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
         Ok(Self {
             listener,
             tls_config,
@@ -227,6 +228,7 @@ impl Server {
             pool,
             request_crawl_tx,
             subscribe_repos_tx,
+            rt,
         })
     }
 
@@ -448,7 +450,7 @@ impl Server {
 
         use sqlx::Row as _;
         let pool = self.pool.clone();
-        let banned_set = block_on_db(async move {
+        let banned_set = block_on_db(&self.rt, async move {
             let rows = sqlx::query("SELECT host FROM banned_hosts").fetch_all(&pool).await?;
             Ok::<_, sqlx::Error>(
                 rows.into_iter()
@@ -459,7 +461,7 @@ impl Server {
         .map_err(|e| eyre!("{e}"))?;
 
         let pool = self.pool.clone();
-        let raw_rows = block_on_db(async move {
+        let raw_rows = block_on_db(&self.rt, async move {
             if let Some(ref after) = cursor {
                 sqlx::query("SELECT host, cursor FROM hosts WHERE host > $1 ORDER BY host LIMIT $2")
                     .bind(after)
@@ -510,7 +512,7 @@ impl Server {
         use sqlx::Row as _;
         let pool = self.pool.clone();
         let hn = hostname.clone();
-        let row = block_on_db(async move {
+        let row = block_on_db(&self.rt, async move {
             sqlx::query("SELECT cursor FROM hosts WHERE host = $1")
                 .bind(&hn)
                 .fetch_optional(&pool)
@@ -597,7 +599,7 @@ impl Server {
     fn query_hosts(&mut self) -> Result<()> {
         use sqlx::Row as _;
         let pool = self.pool.clone();
-        let labelers: Vec<String> = block_on_db(async move {
+        let labelers: Vec<String> = block_on_db(&self.rt, async move {
             let rows = sqlx::query(
                 "SELECT DISTINCT pds_endpoint FROM plc_keys WHERE pds_endpoint IS NOT NULL",
             )
@@ -625,7 +627,7 @@ impl Server {
     fn ban_host(&self, hostname: &str) -> Result<()> {
         let pool = self.pool.clone();
         let host = hostname.to_owned();
-        block_on_db(async move {
+        block_on_db(&self.rt, async move {
             sqlx::query(
                 "INSERT INTO banned_hosts (host) VALUES ($1) ON CONFLICT (host) DO NOTHING",
             )
@@ -642,7 +644,7 @@ impl Server {
     fn unban_host(&self, hostname: &str) -> Result<()> {
         let pool = self.pool.clone();
         let host = hostname.to_owned();
-        block_on_db(async move {
+        block_on_db(&self.rt, async move {
             sqlx::query("DELETE FROM banned_hosts WHERE host = $1")
                 .bind(&host)
                 .execute(&pool)
@@ -657,7 +659,7 @@ impl Server {
     fn list_bans(&self) -> Result<ListBans> {
         use sqlx::Row as _;
         let pool = self.pool.clone();
-        let rows = block_on_db(async move {
+        let rows = block_on_db(&self.rt, async move {
             sqlx::query("SELECT host, created_at FROM banned_hosts ORDER BY created_at")
                 .fetch_all(&pool)
                 .await
@@ -682,7 +684,7 @@ impl Server {
     fn is_host_banned(&self, hostname: &str) -> bool {
         let pool = self.pool.clone();
         let host = hostname.to_owned();
-        block_on_db(async move {
+        block_on_db(&self.rt, async move {
             let row = sqlx::query("SELECT 1 AS exists FROM banned_hosts WHERE host = $1")
                 .bind(&host)
                 .fetch_optional(&pool)
