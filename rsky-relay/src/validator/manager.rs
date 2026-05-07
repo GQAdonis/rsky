@@ -143,11 +143,12 @@ impl<R: IdentityResolver> Manager<R> {
         Ok(())
     }
 
-    fn persist(&mut self) -> Result<(), ManagerError> {
-        // Run the async persist in the current Tokio context.
-        // This is called from both the async run() loop (via block_in_place)
-        // and from Drop (which may not have an async context — we use try_current).
-        let pool = self.pool.clone();
+    /// Persist host cursors to PostgreSQL using a single batch UPSERT.
+    ///
+    /// This is a proper async fn called with `.await` from the async `update()` loop.
+    /// Using `block_in_place + handle.block_on` inside an async context causes a
+    /// Tokio deadlock when all worker threads are blocked, so we avoid that pattern here.
+    async fn persist(&mut self) -> Result<(), ManagerError> {
         let hosts: Vec<(String, i64, DateTime<Utc>)> = self
             .hosts
             .iter()
@@ -158,31 +159,25 @@ impl<R: IdentityResolver> Manager<R> {
             })
             .collect();
 
-        tokio::task::block_in_place(|| {
-            let handle = tokio::runtime::Handle::try_current()
-                .map_err(|e| sqlx::Error::Protocol(format!("no tokio runtime in persist: {e}")))?;
-            handle.block_on(async move {
-                if hosts.is_empty() {
-                    return Ok::<_, sqlx::Error>(());
-                }
-                // Batch all host UPSERTs in a single query using UNNEST to avoid
-                // holding a pool connection for N sequential round-trips.
-                let host_names: Vec<&str> = hosts.iter().map(|(h, _, _)| h.as_str()).collect();
-                let cursors: Vec<i64> = hosts.iter().map(|(_, c, _)| *c).collect();
-                let latests: Vec<DateTime<Utc>> = hosts.iter().map(|(_, _, t)| *t).collect();
-                sqlx::query(
-                    "INSERT INTO hosts (host, cursor, latest) \
-                     SELECT * FROM UNNEST($1::text[], $2::bigint[], $3::timestamptz[]) AS t(host, cursor, latest) \
-                     ON CONFLICT(host) DO UPDATE SET cursor = EXCLUDED.cursor, latest = EXCLUDED.latest",
-                )
-                .bind(&host_names)
-                .bind(&cursors)
-                .bind(&latests)
-                .execute(&pool)
-                .await?;
-                Ok::<_, sqlx::Error>(())
-            })
-        })?;
+        if hosts.is_empty() {
+            return Ok(());
+        }
+
+        // Batch all host UPSERTs in a single query using UNNEST to avoid
+        // holding a pool connection for N sequential round-trips.
+        let host_names: Vec<&str> = hosts.iter().map(|(h, _, _)| h.as_str()).collect();
+        let cursors: Vec<i64> = hosts.iter().map(|(_, c, _)| *c).collect();
+        let latests: Vec<DateTime<Utc>> = hosts.iter().map(|(_, _, t)| *t).collect();
+        sqlx::query(
+            "INSERT INTO hosts (host, cursor, latest) \
+             SELECT * FROM UNNEST($1::text[], $2::bigint[], $3::timestamptz[]) AS t(host, cursor, latest) \
+             ON CONFLICT(host) DO UPDATE SET cursor = EXCLUDED.cursor, latest = EXCLUDED.latest",
+        )
+        .bind(&host_names)
+        .bind(&cursors)
+        .bind(&latests)
+        .execute(&self.pool)
+        .await?;
 
         Ok(())
     }
@@ -195,7 +190,7 @@ impl<R: IdentityResolver> Manager<R> {
 
         let now = Instant::now();
         if self.last + HOSTS_WRITE_INTERVAL < now {
-            self.persist()?;
+            self.persist().await?;
             self.last = now;
         }
 
@@ -489,8 +484,17 @@ impl<R: IdentityResolver> Drop for Manager<R> {
     fn drop(&mut self) {
         SHUTDOWN.store(true, Ordering::Relaxed);
 
-        if let Err(err) = self.persist() {
-            tracing::warn!(%err, "unable to persist host state\n{:#?}", self.hosts);
+        // persist() is async; create a temporary single-thread RT for the drop path.
+        // This avoids block_in_place + handle.block_on deadlock that occurs in the main loop.
+        match tokio::runtime::Builder::new_current_thread().enable_all().build() {
+            Ok(rt) => {
+                if let Err(err) = rt.block_on(self.persist()) {
+                    tracing::warn!(%err, "unable to persist host state on drop\n{:#?}", self.hosts);
+                }
+            }
+            Err(err) => {
+                tracing::warn!(%err, "unable to build runtime for drop persist");
+            }
         }
 
         #[cfg(not(feature = "labeler"))]
