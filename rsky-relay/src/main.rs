@@ -20,12 +20,16 @@ use tracing_subscriber::fmt::Layer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
+use sqlx::migrate::MigrateDatabase;
+use sqlx::postgres::{PgListener, PgPoolOptions};
+
 use rsky_relay::config::{
-    CAPACITY_MSGS, CAPACITY_REQS, METRICS_LISTEN, WORKERS_CRAWLERS, WORKERS_PUBLISHERS,
+    CAPACITY_MSGS, CAPACITY_REQS, DATABASE_URL, METRICS_LISTEN, WORKERS_CRAWLERS,
+    WORKERS_PUBLISHERS,
 };
 use rsky_relay::{
-    CrawlerManager, MessageRecycle, PublisherManager, RelayError, SHUTDOWN, Server,
-    ValidatorManager, metrics,
+    BAN_REFRESH_NEEDED, CrawlerManager, MessageRecycle, PgPool, PublisherManager, RelayError,
+    SHUTDOWN, Server, ValidatorManager, metrics,
 };
 
 #[global_allocator]
@@ -82,6 +86,56 @@ pub async fn main() -> Result<()> {
 
     let args = Args::parse();
 
+    // Ensure the database exists (no-op if already present) then run migrations.
+    let db_url: &str = &DATABASE_URL;
+    if !sqlx::Postgres::database_exists(db_url).await? {
+        tracing::info!("creating relay database");
+        sqlx::Postgres::create_database(db_url).await?;
+    }
+    let pool: PgPool = PgPoolOptions::new()
+        .max_connections(10)
+        .connect(db_url)
+        .await?;
+    sqlx::migrate!("./migrations").run(&pool).await?;
+    tracing::info!("database migrations complete");
+
+    // Spawn a LISTEN task that watches the `banned_hosts_changed` channel and
+    // sets BAN_REFRESH_NEEDED so the crawler manager reacts instantly instead
+    // of waiting for the BAN_REFRESH_INTERVAL polling fallback.
+    tokio::spawn(async move {
+        loop {
+            match PgListener::connect(db_url).await {
+                Err(err) => {
+                    tracing::warn!(%err, "ban-listener: failed to connect, retrying in 10s");
+                    tokio::time::sleep(Duration::from_secs(10)).await;
+                }
+                Ok(mut listener) => {
+                    if let Err(err) = listener.listen("banned_hosts_changed").await {
+                        tracing::warn!(%err, "ban-listener: failed to LISTEN, retrying in 10s");
+                        tokio::time::sleep(Duration::from_secs(10)).await;
+                        continue;
+                    }
+                    tracing::info!("ban-listener: listening on banned_hosts_changed");
+                    loop {
+                        match listener.recv().await {
+                            Ok(notification) => {
+                                tracing::debug!(
+                                    payload = notification.payload(),
+                                    "ban-listener: received notification"
+                                );
+                                BAN_REFRESH_NEEDED.store(true, Ordering::Relaxed);
+                            }
+                            Err(err) => {
+                                tracing::warn!(%err, "ban-listener: connection lost, reconnecting");
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+
     let terminate_now = Arc::new(AtomicBool::new(false));
     flag::register_conditional_shutdown(SIGINT, 1, Arc::clone(&terminate_now))?;
     flag::register(SIGINT, Arc::clone(&terminate_now))?;
@@ -90,9 +144,9 @@ pub async fn main() -> Result<()> {
         thingbuf::mpsc::blocking::with_recycle(CAPACITY_MSGS, MessageRecycle);
     let (request_crawl_tx, request_crawl_rx) = rtrb::RingBuffer::new(CAPACITY_REQS);
     let (subscribe_repos_tx, subscribe_repos_rx) = rtrb::RingBuffer::new(CAPACITY_REQS);
-    let validator = ValidatorManager::new(message_rx)?;
+    let validator = ValidatorManager::new(message_rx, pool.clone())?;
     let server =
-        Server::new(args.certs.zip(args.private_key), request_crawl_tx, subscribe_repos_tx)?;
+        Server::new(args.certs.zip(args.private_key), request_crawl_tx, subscribe_repos_tx, pool.clone())?;
     // Track validator status via AtomicBool so the main loop can detect
     // validator death without owning the JoinHandle (which stays outside the closure).
     let validator_dead = Arc::new(AtomicBool::new(false));
@@ -102,7 +156,7 @@ pub async fn main() -> Result<()> {
         validator_dead_clone.store(true, Ordering::Relaxed);
         result
     });
-    let crawler = CrawlerManager::new(WORKERS_CRAWLERS, &message_tx, request_crawl_rx)?;
+    let crawler = CrawlerManager::new(WORKERS_CRAWLERS, &message_tx, request_crawl_rx, pool.clone())?;
     let publisher = PublisherManager::new(WORKERS_PUBLISHERS, subscribe_repos_rx)?;
     #[expect(clippy::vec_init_then_push)]
     let ret = thread::scope(move |s| {

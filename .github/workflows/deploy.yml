@@ -446,6 +446,8 @@ jobs:
           GCS_HMAC_SECRET_KEY: ${{ secrets.GCS_HMAC_SECRET_KEY }}
           GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
           RELAY_ADMIN_PASSWORD: ${{ secrets.RELAY_ADMIN_PASSWORD }}
+          RELAY_PG_USER: ${{ secrets.RELAY_PG_USER }}
+          RELAY_PG_PASSWORD: ${{ secrets.RELAY_PG_PASSWORD }}
           RSKY_API_KEY: ${{ secrets.RSKY_API_KEY }}
           MOD_SERVICE_DID: ${{ secrets.MOD_SERVICE_DID }}
           MOD_SERVICE_EMAIL: ${{ secrets.MOD_SERVICE_EMAIL }}
@@ -509,6 +511,18 @@ jobs:
         run: |
           sed "s|IMAGE_TAG|${{ needs.build-pds.outputs.image_tag }}|g" \
             k8s/rsky-pds/statefulset.yaml | kubectl apply -f -
+
+      # ── rsky-relay-postgres ───────────────────────────────────────────────
+      # Dedicated PostgreSQL for relay (isolated from main postgresql-0).
+      # Uses LISTEN/NOTIFY for real-time ban/cursor updates.
+      - name: Apply rsky-relay-postgres manifests
+        run: |
+          kubectl apply -f k8s/rsky-relay/postgres-statefulset.yaml
+
+      - name: Wait for rsky-relay-postgres ready
+        run: |
+          kubectl rollout status statefulset/rsky-relay-postgres \
+            -n atproto --timeout=300s
 
       # ── rsky-relay ────────────────────────────────────────────────────────
       - name: Apply rsky-relay manifests

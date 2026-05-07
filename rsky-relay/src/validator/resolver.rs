@@ -10,7 +10,6 @@ use futures::stream::FuturesUnordered;
 use hashbrown::HashSet;
 use lru::LruCache;
 use reqwest::Client;
-use rusqlite::{Connection, OpenFlags, OptionalExtension};
 use serde::Deserialize;
 use serde_json::value::RawValue;
 use thiserror::Error;
@@ -18,6 +17,7 @@ use tokio::time::timeout;
 
 use rsky_identity::types::DidDocument;
 
+use crate::PgPool;
 use crate::config::{CAPACITY_CACHE, DO_PLC_EXPORT, PLC_EXPORT_INTERVAL};
 use crate::validator::event::{DidEndpoint, DidKey};
 
@@ -53,8 +53,8 @@ enum Query {
 
 #[derive(Debug, Error)]
 pub enum ResolverError {
-    #[error("sqlite error: {0}")]
-    Sqlite(#[from] rusqlite::Error),
+    #[error("database error: {0}")]
+    Database(#[from] sqlx::Error),
     #[error("size error")]
     SizeError,
     #[error("http error: {0}")]
@@ -64,53 +64,41 @@ pub enum ResolverError {
 pub struct Resolver {
     cache: LruCache<String, (DidEndpoint, DidKey)>,
     /// Only present when DO_PLC_EXPORT is true.
-    plc_db: Option<(Connection, Instant, Option<String>)>,
+    /// Tuple: (pool, last_export_instant, after_cursor)
+    plc_db: Option<(PgPool, Instant, Option<String>)>,
     client: Client,
     inflight: HashSet<String>,
     futures: FuturesUnordered<RequestFuture>,
 }
 
 impl Resolver {
-    pub fn new() -> Result<Self, ResolverError> {
+    pub fn new(pool: PgPool) -> Result<Self, ResolverError> {
         #[expect(clippy::unwrap_used)]
         let cache = LruCache::new(NonZeroUsize::new(CAPACITY_CACHE).unwrap());
 
         let plc_db = if *DO_PLC_EXPORT {
-            let conn = Connection::open_with_flags(
-                "plc_directory.db",
-                OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE,
-            )?;
-            conn.busy_timeout(std::time::Duration::from_secs(5))?;
-            conn.execute_batch("PRAGMA journal_mode = WAL; PRAGMA wal_autocheckpoint = 1000;")?;
-            conn.execute_batch(
-                "CREATE TABLE IF NOT EXISTS plc_operations (
-                    cid       TEXT    NOT NULL,
-                    did       TEXT    NOT NULL,
-                    created_at TEXT   NOT NULL,
-                    nullified INTEGER NOT NULL DEFAULT 0,
-                    operation BLOB    NOT NULL,
-                    PRIMARY KEY (cid)
-                );
-                CREATE INDEX IF NOT EXISTS plc_ops_created_at
-                    ON plc_operations (created_at DESC);",
-            )?;
-            match conn.execute("PRAGMA secure_delete = OFF", []) {
-                Ok(_) | Err(rusqlite::Error::ExecuteReturnedResults) => {}
-                Err(err) => Err(err)?,
-            }
-            conn.execute("PRAGMA synchronous = NORMAL", [])?;
-            conn.execute("PRAGMA incremental_vacuum", [])?;
-            conn.execute("PRAGMA optimize = 0x10002", [])?;
             let now = Instant::now();
             let last = now.checked_sub(PLC_EXPORT_INTERVAL).unwrap_or(now);
-            let after = conn
-                .query_row(
-                    "SELECT created_at FROM plc_operations ORDER BY created_at DESC LIMIT 1",
-                    [],
-                    |row| row.get("created_at"),
-                )
-                .optional()?;
-            Some((conn, last, after))
+            // Determine the most recent created_at already stored so we can resume.
+            let after = tokio::task::block_in_place(|| {
+                let handle = tokio::runtime::Handle::try_current().map_err(|e| {
+                    sqlx::Error::Protocol(format!("no tokio runtime in Resolver::new: {e}"))
+                })?;
+                handle.block_on(async {
+                    use sqlx::Row as _;
+                    let row = sqlx::query(
+                        "SELECT created_at FROM plc_operations ORDER BY created_at DESC LIMIT 1",
+                    )
+                    .fetch_optional(&pool)
+                    .await?;
+                    Ok::<_, sqlx::Error>(row.and_then(|r| {
+                        r.try_get::<DateTime<Utc>, _>("created_at")
+                            .map(|ts| ts.to_rfc3339())
+                            .ok()
+                    }))
+                })
+            })?;
+            Some((pool, last, after))
         } else {
             None
         };
@@ -144,37 +132,37 @@ impl Resolver {
             return Ok(None);
         }
         // if let Some(_) = self.cache.get(did) doesn't work because of NLL
-        if self.cache.get(did).is_some() || self.query_db(did)? {
+        if self.cache.get(did).is_some() {
             return Ok(self.cache.peek_mru().map(|(_, v)| (v.0.as_ref().map(AsRef::as_ref), &v.1)));
         }
         self.request(did);
         Ok(None)
     }
 
-    pub fn query_db(&mut self, did: &str) -> Result<bool, ResolverError> {
-        let Some((conn, _, _)) = self.plc_db.as_mut() else {
+    /// Query the PLC keys table for a cached key/endpoint pair.
+    ///
+    /// Returns `true` and populates the LRU cache when a row is found.
+    pub async fn query_db(&mut self, did: &str) -> Result<bool, ResolverError> {
+        let Some((pool, _, _)) = self.plc_db.as_ref() else {
             return Ok(false);
         };
-        let mut stmt = conn.prepare_cached("SELECT * FROM plc_keys WHERE did = ?1")?;
-        match stmt.query_one([did], |row| {
-            let endpoint =
-                if cfg!(feature = "labeler") { "labeler_endpoint" } else { "pds_endpoint" };
-            let key = if cfg!(feature = "labeler") { "labeler_key" } else { "pds_key" };
-            let endpoint = row.get_ref(endpoint)?.as_str_or_null()?;
-            let key = row.get_ref(key)?.as_str_or_null()?;
-            Ok(parse_key_endpoint(endpoint, key))
-        }) {
-            Ok(Some((pds, key))) => {
-                self.cache.put(did.to_owned(), (pds, key));
+        use sqlx::Row as _;
+        let did_owned = did.to_owned();
+        let row = sqlx::query(
+            "SELECT pds_endpoint AS endpoint, pds_key AS key FROM plc_keys WHERE did = $1",
+        )
+        .bind(&did_owned)
+        .fetch_optional(pool)
+        .await?;
+
+        if let Some(r) = row {
+            let endpoint: Option<String> = r.try_get("endpoint").unwrap_or(None);
+            let key: Option<String> = r.try_get("key").unwrap_or(None);
+            if let Some(pair) = parse_key_endpoint(endpoint.as_deref(), key.as_deref()) {
+                self.cache.put(did.to_owned(), pair);
                 return Ok(true);
             }
-            Ok(None) => {}
-            Err(rusqlite::Error::QueryReturnedNoRows) => {
-                tracing::trace!("not found in db");
-            }
-            Err(err) => Err(err)?,
         }
-        drop(stmt);
         Ok(false)
     }
 
@@ -248,32 +236,50 @@ impl Resolver {
                         }
                     }
                     Query::Export(after) => {
-                        let Some((conn, _, after_slot)) = self.plc_db.as_mut() else {
+                        let Some((pool, _, after_slot)) = self.plc_db.as_mut() else {
                             return Ok(Vec::new());
                         };
                         *after_slot = Some(after);
                         let mut dids = Vec::new();
                         let mut count = 0;
-                        let tx = conn.transaction()?;
-                        let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO plc_operations (cid, did, created_at, nullified, operation) VALUES (?1, ?2, ?3, ?4, ?5)")?;
+
+                        // Collect all PLC documents from the response.
+                        let mut docs: Vec<OwnedPlcDocument> = Vec::new();
                         for line in bytes.reader().lines() {
                             count += 1;
-                            if let Some(doc) = parse_plc_doc(&line.unwrap_or_default()) {
-                                stmt.execute((
-                                    &doc.cid,
-                                    &doc.did,
-                                    &doc.created_at,
-                                    &doc.nullified,
-                                    doc.operation.get().as_bytes(),
-                                ))?;
-                                *after_slot = Some(doc.created_at.clone());
-                                if self.inflight.remove(&doc.did) {
-                                    dids.push(doc.did);
-                                }
+                            if let Some(doc) = parse_plc_doc_owned(&line.unwrap_or_default()) {
+                                docs.push(doc);
                             }
                         }
-                        drop(stmt);
-                        tx.commit()?;
+
+                        // Bulk-insert in an explicit transaction.
+                        let pool_ref = pool.clone();
+                        let mut tx = pool_ref.begin().await?;
+                        for doc in &docs {
+                            let created_at = doc
+                                .created_at
+                                .parse::<DateTime<Utc>>()
+                                .unwrap_or(DateTime::UNIX_EPOCH);
+                            sqlx::query(
+                                "INSERT INTO plc_operations \
+                                 (cid, did, created_at, nullified, operation) \
+                                 VALUES ($1, $2, $3, $4, $5) \
+                                 ON CONFLICT (cid) DO NOTHING",
+                            )
+                            .bind(&doc.cid)
+                            .bind(&doc.did)
+                            .bind(created_at)
+                            .bind(doc.nullified)
+                            .bind(doc.operation.as_bytes())
+                            .execute(&mut *tx)
+                            .await?;
+                            *after_slot = Some(doc.created_at.clone());
+                            if self.inflight.remove(&doc.did) {
+                                dids.push(doc.did.clone());
+                            }
+                        }
+                        tx.commit().await?;
+
                         if count == 1000 {
                             self.send_req(None, None);
                         } else {
@@ -315,6 +321,15 @@ struct PlcDocument<'a> {
     created_at: String,
 }
 
+/// Owned variant of `PlcDocument` used after the line-parsing phase.
+struct OwnedPlcDocument {
+    did: String,
+    operation: String,
+    cid: String,
+    nullified: bool,
+    created_at: String,
+}
+
 impl IdentityResolver for Resolver {
     #[inline]
     fn expire(&mut self, did: &str, time: DateTime<Utc>) {
@@ -344,16 +359,22 @@ impl IdentityResolver for Resolver {
     }
 }
 
-fn parse_plc_doc(input: &str) -> Option<PlcDocument<'_>> {
+fn parse_plc_doc_owned(input: &str) -> Option<OwnedPlcDocument> {
     match serde_json::from_slice::<PlcDocument<'_>>(input.as_bytes()) {
         Ok(doc) => {
-            return Some(doc);
+            Some(OwnedPlcDocument {
+                did: doc.did,
+                cid: doc.cid,
+                nullified: doc.nullified,
+                created_at: doc.created_at,
+                operation: doc.operation.get().to_owned(),
+            })
         }
         Err(err) => {
             tracing::debug!(%input, %err, "parse error");
+            None
         }
     }
-    None
 }
 
 fn parse_did_doc(input: &Bytes) -> Option<(String, (DidEndpoint, DidKey))> {

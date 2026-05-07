@@ -70,6 +70,17 @@ use thiserror::Error;
 
 pub static SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
+/// Set to `true` by the `PgListener` task (spawned in `main`) whenever a
+/// `banned_hosts_changed` NOTIFY arrives. The crawler manager's update loop
+/// checks this flag and clears it, enabling instant ban propagation instead of
+/// waiting for the `BAN_REFRESH_INTERVAL` polling fallback.
+pub static BAN_REFRESH_NEEDED: AtomicBool = AtomicBool::new(false);
+
+/// Shared PostgreSQL connection pool. Initialised once in `main` and passed by reference
+/// to all components that need it. Using a static avoids threading the pool through every
+/// struct while keeping the pool lifetime tied to the process.
+pub type PgPool = sqlx::PgPool;
+
 pub use crawler::Manager as CrawlerManager;
 pub use publisher::Manager as PublisherManager;
 pub use server::Server;

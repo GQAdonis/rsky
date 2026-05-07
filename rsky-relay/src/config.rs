@@ -2,6 +2,13 @@ use std::env;
 use std::sync::LazyLock;
 use std::time::Duration;
 
+// database
+pub static DATABASE_URL: LazyLock<String> = LazyLock::new(|| {
+    env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://rsky:rsky@localhost:5432/rsky_relay".to_owned()
+    })
+});
+
 // admin
 pub static ADMIN_PASSWORD: LazyLock<Option<String>> =
     LazyLock::new(|| env::var("RELAY_ADMIN_PASSWORD").ok().filter(|s| !s.is_empty()));

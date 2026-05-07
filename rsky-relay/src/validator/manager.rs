@@ -8,7 +8,6 @@ use fjall::{Batch, PartitionCreateOptions, PartitionHandle, PersistMode};
 use hashbrown::HashMap;
 #[cfg(not(feature = "labeler"))]
 use hashbrown::hash_map::Entry;
-use rusqlite::Connection;
 use thiserror::Error;
 
 use crate::SHUTDOWN;
@@ -20,6 +19,7 @@ use crate::validator::resolver::{IdentityResolver, Resolver, ResolverError};
 #[cfg(not(feature = "labeler"))]
 use crate::validator::types::RepoState;
 use crate::validator::utils;
+use crate::PgPool;
 
 const SLEEP: Duration = Duration::from_micros(100);
 
@@ -33,8 +33,8 @@ pub enum ManagerError {
     Resolver(#[from] ResolverError),
     #[error("time error: {0}")]
     Time(#[from] SystemTimeError),
-    #[error("sqlite error: {0}")]
-    Sqlite(#[from] rusqlite::Error),
+    #[error("database error: {0}")]
+    Database(#[from] sqlx::Error),
     #[error("fjall error: {0}")]
     Fjall(#[from] fjall::Error),
     #[error("decode error: {0}")]
@@ -48,41 +48,26 @@ pub struct Manager<R: IdentityResolver = Resolver> {
     repos: HashMap<String, RepoState>,
     resolver: R,
     last: Instant,
-    conn: Connection,
+    pool: PgPool,
     queue: PartitionHandle,
     firehose: PartitionHandle,
 }
 
 impl Manager<Resolver> {
-    pub fn new(message_rx: MessageReceiver) -> Result<Self, ManagerError> {
-        Self::with_resolver(message_rx, Resolver::new()?)
+    pub fn new(message_rx: MessageReceiver, pool: PgPool) -> Result<Self, ManagerError> {
+        Self::with_resolver(message_rx, Resolver::new(pool.clone())?, pool)
     }
 }
 
 impl<R: IdentityResolver> Manager<R> {
-    pub fn with_resolver(message_rx: MessageReceiver, resolver: R) -> Result<Self, ManagerError> {
+    pub fn with_resolver(
+        message_rx: MessageReceiver, resolver: R, pool: PgPool,
+    ) -> Result<Self, ManagerError> {
         let hosts = HashMap::new();
         #[cfg(not(feature = "labeler"))]
         let repos = HashMap::new();
         let now = Instant::now();
         let last = now.checked_sub(HOSTS_WRITE_INTERVAL).unwrap_or(now);
-        let conn = Connection::open("relay.db")?;
-        conn.execute_batch("PRAGMA journal_mode = WAL")?;
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS hosts (
-                host TEXT PRIMARY KEY,
-                cursor INTEGER NOT NULL,
-                latest TEXT NOT NULL
-            )",
-            (),
-        )?;
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS banned_hosts (
-                host TEXT PRIMARY KEY,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
-            )",
-            (),
-        )?;
         let queue = DB.open_partition("queue", PartitionCreateOptions::default())?;
         let firehose = DB.open_partition("firehose", PartitionCreateOptions::default())?;
         Ok(Self {
@@ -92,7 +77,7 @@ impl<R: IdentityResolver> Manager<R> {
             repos,
             resolver,
             last,
-            conn,
+            pool,
             queue,
             firehose,
         })
@@ -101,12 +86,15 @@ impl<R: IdentityResolver> Manager<R> {
     pub async fn run(mut self) -> Result<(), ManagerError> {
         let mut hosts = 0;
         {
-            let mut stmt = self.conn.prepare_cached("SELECT host, cursor FROM hosts")?;
-            let mut rows = stmt.query(())?;
-            while let Some(row) = rows.next()? {
-                let host = row.get_unwrap("host");
-                let cursor: u64 = row.get_unwrap("cursor");
-                self.hosts.insert(host, (cursor.into(), DateTime::UNIX_EPOCH));
+            let rows = sqlx::query("SELECT host, cursor FROM hosts")
+                .fetch_all(&self.pool)
+                .await?;
+            for row in rows {
+                use sqlx::Row as _;
+                let host: String = row.try_get("host")?;
+                let cursor: i64 = row.try_get("cursor")?;
+                #[expect(clippy::cast_sign_loss)]
+                self.hosts.insert(host, (Cursor::from(cursor as u64), DateTime::UNIX_EPOCH));
                 hosts += 1;
             }
         }
@@ -114,7 +102,7 @@ impl<R: IdentityResolver> Manager<R> {
         let mut repos = 0;
         #[cfg(not(feature = "labeler"))]
         {
-            // TODO: move this to sqlite
+            // TODO: move this to postgres
             let handle = DB.open_partition("repos", PartitionCreateOptions::default())?;
             self.repos.reserve(handle.approximate_len());
             for res in handle.iter() {
@@ -158,23 +146,39 @@ impl<R: IdentityResolver> Manager<R> {
     }
 
     fn persist(&mut self) -> Result<(), ManagerError> {
-        // persist hosts data
-        let tx = self.conn.transaction()?;
-        let mut stmt = tx.prepare_cached(
-            "
-                INSERT INTO hosts (host, cursor, latest)
-                VALUES (?1, ?2, ?3)
-                ON CONFLICT(host)
-                DO UPDATE SET cursor = excluded.cursor, latest = excluded.latest
-            ",
-        )?;
-        for (host, (cursor, time)) in &self.hosts {
-            if *time != DateTime::UNIX_EPOCH {
-                stmt.execute((host, cursor.get(), time))?;
-            }
-        }
-        drop(stmt);
-        tx.commit()?;
+        // Run the async persist in the current Tokio context.
+        // This is called from both the async run() loop (via block_in_place)
+        // and from Drop (which may not have an async context — we use try_current).
+        let pool = self.pool.clone();
+        let hosts: Vec<(String, i64, DateTime<Utc>)> = self
+            .hosts
+            .iter()
+            .filter(|(_, (_, time))| *time != DateTime::UNIX_EPOCH)
+            .map(|(host, (cursor, time))| {
+                #[expect(clippy::cast_possible_wrap)]
+                (host.clone(), cursor.get() as i64, *time)
+            })
+            .collect();
+
+        tokio::task::block_in_place(|| {
+            let handle = tokio::runtime::Handle::try_current().map_err(|e| {
+                sqlx::Error::Protocol(format!("no tokio runtime in persist: {e}"))
+            })?;
+            handle.block_on(async move {
+                for (host, cursor, latest) in &hosts {
+                    sqlx::query(
+                        "INSERT INTO hosts (host, cursor, latest) VALUES ($1, $2, $3) \
+                         ON CONFLICT(host) DO UPDATE SET cursor = EXCLUDED.cursor, latest = EXCLUDED.latest",
+                    )
+                    .bind(host)
+                    .bind(cursor)
+                    .bind(latest)
+                    .execute(&pool)
+                    .await?;
+                }
+                Ok::<_, sqlx::Error>(())
+            })
+        })?;
 
         Ok(())
     }

@@ -7,9 +7,10 @@ use exponential_backoff::{Backoff, IntoIter as BackoffIter};
 use hashbrown::{HashMap, HashSet};
 use magnetic::Consumer;
 use magnetic::buffer::dynamic::DynamicBufferP2;
-use rusqlite::{Connection, ErrorCode, OpenFlags, OptionalExtension};
 use thiserror::Error;
 
+use crate::BAN_REFRESH_NEEDED;
+use crate::PgPool;
 use crate::SHUTDOWN;
 use crate::config::{BAN_REFRESH_INTERVAL, CAPACITY_STATUS};
 use crate::crawler::RequestCrawl;
@@ -27,8 +28,8 @@ pub enum ManagerError {
     Worker(#[from] WorkerError),
     #[error("rtrb error: {0}")]
     Push(#[from] Box<rtrb::PushError<Command>>),
-    #[error("sqlite error: {0}")]
-    Sqlite(#[from] rusqlite::Error),
+    #[error("database error: {0}")]
+    Database(#[from] sqlx::Error),
     #[error("join error")]
     Join,
 }
@@ -52,7 +53,7 @@ pub struct Manager {
     retries: BTreeMap<Instant, (usize, String)>,
     banned: HashSet<String>,
     last_ban_check: Instant,
-    conn: Connection,
+    pool: PgPool,
     request_crawl_rx: RequestCrawlReceiver,
     status_rx: StatusReceiver,
 }
@@ -60,6 +61,7 @@ pub struct Manager {
 impl Manager {
     pub fn new(
         n_workers: usize, message_tx: &MessageSender, request_crawl_rx: RequestCrawlReceiver,
+        pool: PgPool,
     ) -> Result<Self, ManagerError> {
         #[expect(clippy::unwrap_used)]
         let (status_tx, status_rx) =
@@ -76,10 +78,6 @@ impl Manager {
                 Ok(WorkerHandle { command_tx, thread_handle })
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let conn = Connection::open_with_flags(
-            "relay.db",
-            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        )?;
         let banned = HashSet::new();
         let now = Instant::now();
         let last_ban_check = now.checked_sub(BAN_REFRESH_INTERVAL).unwrap_or(now);
@@ -90,7 +88,7 @@ impl Manager {
             retries: BTreeMap::new(),
             banned,
             last_ban_check,
-            conn,
+            pool,
             request_crawl_rx,
             status_rx,
         })
@@ -119,7 +117,12 @@ impl Manager {
             return Ok(false);
         }
 
-        if self.last_ban_check.elapsed() > BAN_REFRESH_INTERVAL {
+        // Refresh the ban list when either:
+        // (a) the PgListener task set BAN_REFRESH_NEEDED (instant NOTIFY-based path), or
+        // (b) the fallback polling interval has elapsed (handles listener restarts / missed NOTIFYs).
+        let notify_triggered = BAN_REFRESH_NEEDED.swap(false, Ordering::Relaxed);
+        let interval_elapsed = self.last_ban_check.elapsed() > BAN_REFRESH_INTERVAL;
+        if notify_triggered || interval_elapsed {
             if let Err(err) = self.refresh_bans() {
                 tracing::warn!(%err, "unable to refresh banned hosts");
             }
@@ -184,14 +187,7 @@ impl Manager {
             [backoff_connect.iter(), backoff_reconnect.iter()]
         });
         if request_crawl.cursor.is_none() {
-            request_crawl.cursor = loop {
-                match self.get_cursor(&request_crawl.hostname) {
-                    Ok(cursor) => break cursor,
-                    Err(ManagerError::Sqlite(err))
-                        if err.sqlite_error_code() == Some(ErrorCode::DatabaseLocked) => {}
-                    Err(err) => Err(err)?,
-                }
-            };
+            request_crawl.cursor = self.get_cursor(&request_crawl.hostname)?;
         }
         self.workers[self.next_id].command_tx.push(Command::Connect(request_crawl))?;
         self.next_id = (self.next_id + 1) % self.workers.len();
@@ -200,27 +196,59 @@ impl Manager {
     }
 
     fn get_cursor(&self, host: &str) -> Result<Option<Cursor>, ManagerError> {
-        let mut stmt = self.conn.prepare_cached("SELECT * FROM hosts WHERE host = ?1")?;
-        Ok(stmt
-            .query_one((&host,), |row| Ok(row.get_unwrap::<_, u64>("cursor")))
-            .optional()?
-            .map(Into::into))
+        let pool = self.pool.clone();
+        let host = host.to_owned();
+        tokio::task::block_in_place(|| {
+            let handle = tokio::runtime::Handle::try_current().map_err(|e| {
+                sqlx::Error::Protocol(format!("no tokio runtime in get_cursor: {e}"))
+            })?;
+            handle.block_on(async move {
+                let row = sqlx::query("SELECT cursor FROM hosts WHERE host = $1")
+                    .bind(&host)
+                    .fetch_optional(&pool)
+                    .await?;
+                Ok::<_, sqlx::Error>(row.map(|r| {
+                    use sqlx::Row as _;
+                    #[expect(clippy::cast_sign_loss)]
+                    let cursor: i64 = r.try_get("cursor").unwrap_or(0);
+                    Cursor::from(cursor as u64)
+                }))
+            })
+        })
+        .map_err(ManagerError::Database)
     }
 
     fn refresh_bans(&mut self) -> Result<(), ManagerError> {
-        let mut stmt = self.conn.prepare_cached("SELECT host FROM banned_hosts")?;
-        let new_bans: HashSet<String> =
-            stmt.query_map([], |row| row.get::<_, String>(0))?.filter_map(Result::ok).collect();
+        let pool = self.pool.clone();
+        let new_bans: HashSet<String> = tokio::task::block_in_place(|| {
+            let handle = tokio::runtime::Handle::try_current().map_err(|e| {
+                sqlx::Error::Protocol(format!("no tokio runtime in refresh_bans: {e}"))
+            })?;
+            handle.block_on(async move {
+                use sqlx::Row as _;
+                let rows = sqlx::query("SELECT host FROM banned_hosts")
+                    .fetch_all(&pool)
+                    .await?;
+                Ok::<_, sqlx::Error>(
+                    rows.into_iter()
+                        .filter_map(|r| r.try_get::<String, _>("host").ok())
+                        .collect()
+                )
+            })
+        })
+        .map_err(ManagerError::Database)?;
 
         for host in &new_bans {
-            if !self.banned.contains(host) {
+            if !self.banned.contains(host.as_str()) {
                 tracing::warn!(%host, "host banned, sending disconnect");
                 for worker in &mut *self.workers {
-                    if let Err(err) = worker.command_tx.push(Command::Disconnect(host.clone())) {
+                    if let Err(err) =
+                        worker.command_tx.push(Command::Disconnect(host.clone()))
+                    {
                         tracing::warn!(%host, %err, "unable to send disconnect to worker");
                     }
                 }
-                self.hosts.remove(host);
+                self.hosts.remove(host.as_str());
                 self.retries.retain(|_, (_, h)| h != host);
             }
         }

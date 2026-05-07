@@ -8,19 +8,15 @@ use std::sync::atomic::Ordering;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use chrono::{DateTime, Utc};
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use httparse::{EMPTY_HEADER, Status};
-#[cfg(not(feature = "labeler"))]
-use rusqlite::named_params;
-#[cfg(feature = "labeler")]
-use rusqlite::{Connection, OpenFlags};
-#[cfg(not(feature = "labeler"))]
-use rusqlite::{Connection, OpenFlags, OptionalExtension};
 use rustls::{ServerConfig, ServerConnection, StreamOwned};
 use thiserror::Error;
 use url::Url;
 
+use crate::PgPool;
 use crate::SHUTDOWN;
 use crate::config::{ADMIN_PASSWORD, HOSTS_INTERVAL, PORT};
 #[cfg(not(feature = "labeler"))]
@@ -131,8 +127,8 @@ pub enum ServerError {
     PushError(#[from] rtrb::PushError<RequestCrawl>),
     #[error("url parse error: {0}")]
     UrlParse(#[from] url::ParseError),
-    #[error("sqlite error: {0}")]
-    Sqlite(#[from] rusqlite::Error),
+    #[error("database error: {0}")]
+    Database(#[from] sqlx::Error),
 }
 
 #[derive(Debug)]
@@ -168,6 +164,23 @@ fn write_response(stream: &mut ErrorOnDropTcpStream, status: &str, body: &str) -
     Ok(())
 }
 
+/// Execute an async sqlx future from synchronous code running on a Tokio blocking thread.
+///
+/// # Errors
+///
+/// Returns [`sqlx::Error`] if the Tokio runtime is unavailable or the query fails.
+fn block_on_db<F, T>(fut: F) -> Result<T, sqlx::Error>
+where
+    F: std::future::Future<Output = Result<T, sqlx::Error>> + Send,
+{
+    tokio::task::block_in_place(|| {
+        let handle = tokio::runtime::Handle::try_current().map_err(|e| {
+            sqlx::Error::Protocol(format!("no tokio runtime in server block_on_db: {e}"))
+        })?;
+        handle.block_on(fut)
+    })
+}
+
 #[derive(Debug)]
 pub struct Server {
     listener: TcpListener,
@@ -175,11 +188,7 @@ pub struct Server {
     base_url: Url,
     buf: Vec<u8>,
     last: Instant,
-    #[cfg(feature = "labeler")]
-    conn: Connection,
-    #[cfg(not(feature = "labeler"))]
-    relay_conn: Connection,
-    admin_conn: Connection,
+    pool: PgPool,
     request_crawl_tx: RequestCrawlSender,
     subscribe_repos_tx: SubscribeReposSender,
 }
@@ -187,7 +196,7 @@ pub struct Server {
 impl Server {
     pub fn new(
         ssl_configs: Option<(PathBuf, PathBuf)>, request_crawl_tx: RequestCrawlSender,
-        subscribe_repos_tx: SubscribeReposSender,
+        subscribe_repos_tx: SubscribeReposSender, pool: PgPool,
     ) -> Result<Self, ServerError> {
         let tls_config = if let Some((certs, private_key)) = ssl_configs {
             let certs = rustls_pemfile::certs(&mut BufReader::new(&mut File::open(certs)?))
@@ -209,33 +218,13 @@ impl Server {
         let base_url = Url::parse("http://example.com")?;
         let now = Instant::now();
         let last = now.checked_sub(HOSTS_INTERVAL).unwrap_or(now);
-        // Created by `ValidatorManager::new`.
-        #[cfg(not(feature = "labeler"))]
-        let relay_conn = Connection::open_with_flags(
-            "relay.db",
-            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        )?;
-        #[cfg(feature = "labeler")]
-        let conn = Connection::open_with_flags(
-            "plc_directory.db",
-            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        )?;
-        let admin_conn = Connection::open_with_flags(
-            "relay.db",
-            OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        )?;
-        admin_conn.busy_timeout(Duration::from_secs(5))?;
         Ok(Self {
             listener,
             tls_config,
             base_url,
             buf: vec![0; 1024],
             last,
-            #[cfg(feature = "labeler")]
-            conn,
-            #[cfg(not(feature = "labeler"))]
-            relay_conn,
-            admin_conn,
+            pool,
             request_crawl_tx,
             subscribe_repos_tx,
         })
@@ -436,74 +425,83 @@ impl Server {
         }
     }
 
+    /// List hosts with keyset pagination using `host` (alphabetical) as the cursor.
+    ///
+    /// The cursor is the last hostname from the previous page. On the first call it is `None`.
     #[cfg(not(feature = "labeler"))]
     fn list_hosts(&self, url: &Url) -> Result<ListHosts> {
-        // Default query parameters.
-        let mut limit = 200;
-        let mut cursor = None;
+        let mut limit: i64 = 200;
+        let mut cursor: Option<String> = None;
 
         for (key, value) in url.query_pairs() {
             match key.as_ref() {
-                "limit" => match value.parse::<u16>() {
+                "limit" => match value.parse::<i64>() {
                     Ok(l @ 1..=1000) => limit = l,
                     _ => {
                         return Err(eyre!("limit parameter invalid or out of range: {value}"));
                     }
                 },
-                "cursor" => match value.parse::<i64>() {
-                    Ok(c) => cursor = Some(c),
-                    Err(_) => {
-                        return Err(eyre!("cursor parameter invalid: {value}"));
-                    }
-                },
-                // Ignore unknown query parameters.
+                "cursor" => cursor = Some(value.into_owned()),
                 _ => (),
             }
         }
 
-        let mut stmt_hosts = self.relay_conn.prepare_cached(
-            "SELECT rowid, host, cursor
-            FROM hosts
-            WHERE :cursor is NULL OR rowid > :cursor
-            LIMIT :limit;",
-        )?;
-        let hosts = stmt_hosts
-            .query_map(
-                named_params! {
-                    ":cursor": cursor,
-                    ":limit": limit,
-                },
-                |row| {
-                    Ok((
-                        row.get::<_, i64>("rowid")?,
-                        row.get::<_, String>("host")?,
-                        row.get::<_, u64>("cursor")?,
-                    ))
-                },
-            )?
-            .collect::<Result<Vec<_>, _>>()?;
+        use sqlx::Row as _;
+        let pool = self.pool.clone();
+        let banned_set = block_on_db(async move {
+            let rows = sqlx::query("SELECT host FROM banned_hosts")
+                .fetch_all(&pool)
+                .await?;
+            Ok::<_, sqlx::Error>(
+                rows.into_iter()
+                    .filter_map(|r| r.try_get::<String, _>("host").ok())
+                    .collect::<hashbrown::HashSet<String>>()
+            )
+        })
+        .map_err(|e| eyre!("{e}"))?;
 
-        let cursor = hosts.last().map(|(rowid, ..)| rowid.to_string());
+        let pool = self.pool.clone();
+        let raw_rows = block_on_db(async move {
+            if let Some(ref after) = cursor {
+                sqlx::query(
+                    "SELECT host, cursor FROM hosts WHERE host > $1 ORDER BY host LIMIT $2",
+                )
+                .bind(after)
+                .bind(limit)
+                .fetch_all(&pool)
+                .await
+            } else {
+                sqlx::query("SELECT host, cursor FROM hosts ORDER BY host LIMIT $1")
+                    .bind(limit)
+                    .fetch_all(&pool)
+                    .await
+            }
+        })
+        .map_err(|e| eyre!("{e}"))?;
 
-        let hosts = hosts
+        let next_cursor = raw_rows.last().and_then(|r| r.try_get::<String, _>("host").ok());
+
+        let hosts = raw_rows
             .into_iter()
-            .map(|(_, hostname, seq)| {
-                let status = if self.is_host_banned(&hostname) {
+            .map(|row| {
+                let hostname: String = row.try_get("host").unwrap_or_default();
+                let seq: i64 = row.try_get("cursor").unwrap_or(0);
+                let status = if banned_set.contains(&hostname) {
                     HostStatus::Banned
                 } else {
                     HostStatus::Active
                 };
+                #[expect(clippy::cast_sign_loss)]
                 Host {
-                    // TODO: Track host account counts.
                     account_count: 0,
+                    seq: seq as u64,
                     hostname,
-                    seq,
                     status,
                 }
             })
             .collect();
 
-        Ok(ListHosts { cursor, hosts })
+        Ok(ListHosts { cursor: next_cursor, hosts })
     }
 
     #[cfg(not(feature = "labeler"))]
@@ -511,25 +509,32 @@ impl Server {
         let mut hostname = None;
         for (key, value) in url.query_pairs() {
             match key.as_ref() {
-                "hostname" => hostname = Some(value.to_string()),
-                // Ignore unknown query parameters.
+                "hostname" => hostname = Some(value.into_owned()),
                 _ => (),
             }
         }
         let hostname = hostname.ok_or_else(|| eyre!("hostname param is required"))?;
-
         let is_banned = self.is_host_banned(&hostname);
-        self.relay_conn
-            .prepare_cached("SELECT cursor FROM hosts WHERE host = :host")?
-            .query_one(named_params! { ":host": hostname.clone() }, |row| {
-                Ok(GetHostStatus {
-                    hostname: hostname.clone(),
-                    seq: row.get("cursor")?,
-                    status: if is_banned { HostStatus::Banned } else { HostStatus::Active },
-                })
-            })
-            .optional()?
-            .ok_or_else(|| eyre!("hostname {hostname:?} not found"))
+
+        use sqlx::Row as _;
+        let pool = self.pool.clone();
+        let hn = hostname.clone();
+        let row = block_on_db(async move {
+            sqlx::query("SELECT cursor FROM hosts WHERE host = $1")
+                .bind(&hn)
+                .fetch_optional(&pool)
+                .await
+        })
+        .map_err(|e| eyre!("{e}"))?
+        .ok_or_else(|| eyre!("hostname {hostname:?} not found"))?;
+
+        let seq: i64 = row.try_get("cursor").unwrap_or(0);
+        #[expect(clippy::cast_sign_loss)]
+        Ok(GetHostStatus {
+            hostname,
+            seq: seq as u64,
+            status: if is_banned { HostStatus::Banned } else { HostStatus::Active },
+        })
     }
 
     #[cfg(not(feature = "labeler"))]
@@ -599,48 +604,103 @@ impl Server {
 
     #[cfg(feature = "labeler")]
     fn query_hosts(&mut self) -> Result<()> {
-        let mut stmt =
-            self.conn.prepare_cached("SELECT DISTINCT labeler_endpoint FROM plc_labelers")?;
-        for res in stmt.query_map([], |row| row.get::<_, String>(0))? {
-            if let Some(hostname) = res?.strip_prefix("https://").map(|x| x.trim_end_matches('/')) {
+        use sqlx::Row as _;
+        let pool = self.pool.clone();
+        let labelers: Vec<String> = block_on_db(async move {
+            let rows = sqlx::query(
+                "SELECT DISTINCT pds_endpoint FROM plc_keys WHERE pds_endpoint IS NOT NULL",
+            )
+            .fetch_all(&pool)
+            .await?;
+            Ok::<_, sqlx::Error>(
+                rows.into_iter()
+                    .filter_map(|r| r.try_get::<Option<String>, _>("pds_endpoint").ok().flatten())
+                    .collect(),
+            )
+        })
+        .map_err(|e| color_eyre::eyre::eyre!("{e}"))?;
+
+        for endpoint in labelers {
+            if let Some(hostname) =
+                endpoint.strip_prefix("https://").map(|x| x.trim_end_matches('/'))
+            {
                 self.request_crawl_tx
                     .push(RequestCrawl { hostname: hostname.to_owned(), cursor: None })?;
             }
         }
-        drop(stmt);
         Ok(())
     }
 
     fn ban_host(&self, hostname: &str) -> Result<()> {
-        self.admin_conn
-            .execute("INSERT OR IGNORE INTO banned_hosts (host) VALUES (?1)", [hostname])?;
+        let pool = self.pool.clone();
+        let host = hostname.to_owned();
+        block_on_db(async move {
+            sqlx::query(
+                "INSERT INTO banned_hosts (host) VALUES ($1) ON CONFLICT (host) DO NOTHING",
+            )
+            .bind(&host)
+            .execute(&pool)
+            .await?;
+            Ok::<_, sqlx::Error>(())
+        })
+        .map_err(|e| color_eyre::eyre::eyre!("{e}"))?;
         tracing::warn!(%hostname, "banned PDS host");
         Ok(())
     }
 
     fn unban_host(&self, hostname: &str) -> Result<()> {
-        self.admin_conn.execute("DELETE FROM banned_hosts WHERE host = ?1", [hostname])?;
+        let pool = self.pool.clone();
+        let host = hostname.to_owned();
+        block_on_db(async move {
+            sqlx::query("DELETE FROM banned_hosts WHERE host = $1")
+                .bind(&host)
+                .execute(&pool)
+                .await?;
+            Ok::<_, sqlx::Error>(())
+        })
+        .map_err(|e| color_eyre::eyre::eyre!("{e}"))?;
         tracing::warn!(%hostname, "unbanned PDS host");
         Ok(())
     }
 
     fn list_bans(&self) -> Result<ListBans> {
-        let mut stmt = self
-            .admin_conn
-            .prepare_cached("SELECT host, created_at FROM banned_hosts ORDER BY created_at")?;
-        let banned_hosts = stmt
-            .query_map([], |row| {
-                Ok(BannedHost { host: row.get("host")?, created_at: row.get("created_at")? })
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
+        use sqlx::Row as _;
+        let pool = self.pool.clone();
+        let rows = block_on_db(async move {
+            sqlx::query("SELECT host, created_at FROM banned_hosts ORDER BY created_at")
+                .fetch_all(&pool)
+                .await
+        })
+        .map_err(|e| color_eyre::eyre::eyre!("{e}"))?;
+
+        let banned_hosts = rows
+            .into_iter()
+            .map(|r| {
+                let host: String = r.try_get("host").unwrap_or_default();
+                let created_at: Option<DateTime<Utc>> = r.try_get("created_at").unwrap_or(None);
+                BannedHost {
+                    host,
+                    created_at: created_at.map_or_else(
+                        || "1970-01-01T00:00:00Z".to_owned(),
+                        |ts| ts.to_rfc3339(),
+                    ),
+                }
+            })
+            .collect();
         Ok(ListBans { banned_hosts })
     }
 
     fn is_host_banned(&self, hostname: &str) -> bool {
-        self.admin_conn
-            .prepare_cached("SELECT 1 FROM banned_hosts WHERE host = ?1")
-            .and_then(|mut stmt| stmt.exists([hostname]))
-            .unwrap_or(false)
+        let pool = self.pool.clone();
+        let host = hostname.to_owned();
+        block_on_db(async move {
+            let row = sqlx::query("SELECT 1 AS exists FROM banned_hosts WHERE host = $1")
+                .bind(&host)
+                .fetch_optional(&pool)
+                .await?;
+            Ok::<_, sqlx::Error>(row.is_some())
+        })
+        .unwrap_or(false)
     }
 
     fn get_query_param(url: &Url, key: &str) -> Option<String> {

@@ -1,0 +1,124 @@
+---
+# Dedicated PostgreSQL instance for rsky-relay.
+# Isolated from the main postgresql-0 instance (which serves rsky-pds/feedgen)
+# to avoid connection pool contention and WAL pressure cross-contamination.
+#
+# Uses LISTEN/NOTIFY for real-time ban/cursor updates instead of polling.
+# The relay connects via: postgres://<user>:<pass>@rsky-relay-postgres:5432/rsky_relay
+#
+# StorageClass: atproto-ssd-immediate (same as main postgres — immediate binding,
+# no xShmMap WAL issues because Postgres manages its own shared memory, not SQLite).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rsky-relay-postgres
+  namespace: atproto
+  labels:
+    app: rsky-relay-postgres
+spec:
+  serviceName: rsky-relay-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rsky-relay-postgres
+  template:
+    metadata:
+      labels:
+        app: rsky-relay-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16.3-alpine
+          args:
+            - "-c"
+            - "max_connections=50"
+            - "-c"
+            - "shared_buffers=256MB"
+            - "-c"
+            - "effective_cache_size=512MB"
+            - "-c"
+            - "work_mem=4MB"
+            - "-c"
+            - "maintenance_work_mem=64MB"
+            - "-c"
+            - "wal_level=replica"
+            - "-c"
+            - "max_wal_size=1GB"
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: rsky-relay-postgres-credentials
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rsky-relay-postgres-credentials
+                  key: password
+            - name: POSTGRES_DB
+              value: rsky_relay
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: rsky-relay-postgres-data
+              mountPath: /var/lib/postgresql/data
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+                - -d
+                - rsky_relay
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+                - -d
+                - rsky_relay
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: rsky-relay-postgres-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: atproto-ssd-immediate
+        resources:
+          requests:
+            storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rsky-relay-postgres
+  namespace: atproto
+  labels:
+    app: rsky-relay-postgres
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+  selector:
+    app: rsky-relay-postgres
