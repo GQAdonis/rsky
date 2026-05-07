@@ -4,8 +4,8 @@ use axum::{
     extract::FromRequestParts,
     http::{StatusCode, request::Parts},
 };
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,7 +39,9 @@ pub struct OptionalViewer(pub Option<Viewer>);
 pub fn decode_token(token: &str) -> Result<Claims> {
     let parts: Vec<&str> = token.splitn(3, '.').collect();
     if parts.len() != 3 {
-        return Err(AppViewError::Auth("malformed JWT: expected 3 segments".into()));
+        return Err(AppViewError::Auth(
+            "malformed JWT: expected 3 segments".into(),
+        ));
     }
 
     let payload_bytes = URL_SAFE_NO_PAD
@@ -132,8 +134,8 @@ mod tests {
     use super::*;
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
-    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use base64::Engine;
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use tower::ServiceExt;
 
     fn make_jwt(header_alg: &str, sub: &str, exp_offset: i64) -> String {

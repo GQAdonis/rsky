@@ -249,7 +249,6 @@ impl FirehoseConsumer {
             last_message_time = std::time::Instant::now();
 
             if let Message::Binary(data) = msg {
-
                 let queue_clone = Arc::clone(queue);
                 let semaphore_clone = Arc::clone(&semaphore);
                 let last_seq_clone = Arc::clone(&last_seq);

@@ -200,10 +200,10 @@ pub async fn get_suggestions(
     }))
 }
 
-pub async fn get_preferences(
-    State(_state): State<AppState>,
-) -> Result<Json<GetPreferencesOutput>> {
-    Ok(Json(GetPreferencesOutput { preferences: vec![] }))
+pub async fn get_preferences(State(_state): State<AppState>) -> Result<Json<GetPreferencesOutput>> {
+    Ok(Json(GetPreferencesOutput {
+        preferences: vec![],
+    }))
 }
 
 pub async fn put_preferences(

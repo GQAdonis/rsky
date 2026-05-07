@@ -143,7 +143,12 @@ pub async fn get_author_feed(
     // The DB feed query uses `WHERE p.creator = $1` which only matches DIDs
     let actor_did = match db::actor::get_profile(&state.db, &params.actor).await? {
         Some(row) => row.did,
-        None => return Ok(Json(AuthorFeedOutput { feed: vec![], cursor: None })),
+        None => {
+            return Ok(Json(AuthorFeedOutput {
+                feed: vec![],
+                cursor: None,
+            }));
+        }
     };
     let rows = db::feed::get_author_feed(
         &state.db,

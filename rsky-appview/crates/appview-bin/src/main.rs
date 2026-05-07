@@ -35,18 +35,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Run schema migrations on startup — creates tables if they don't exist.
     // The migration SQL is embedded at compile time.
-    run_migrations(&db).await.map_err(|e| AppViewError::Database(e.to_string()))?;
+    run_migrations(&db)
+        .await
+        .map_err(|e| AppViewError::Database(e.to_string()))?;
     info!("Schema migrations applied");
 
     let handle: PrometheusHandle = metrics_exporter_prometheus::PrometheusBuilder::new()
         .install_recorder()
         .expect("failed to install Prometheus recorder");
 
-    let queue_path = std::env::var("QUEUE_PATH")
-        .unwrap_or_else(|_| "/data/appview-queue".to_string());
-    let queue = Arc::new(IndexQueue::new(Some(std::path::PathBuf::from(
-        queue_path,
-    )))?);
+    let queue_path =
+        std::env::var("QUEUE_PATH").unwrap_or_else(|_| "/data/appview-queue".to_string());
+    let queue = Arc::new(IndexQueue::new(Some(std::path::PathBuf::from(queue_path)))?);
     // Reuse the shared pool instead of creating a second pool in AppStateInner.
     let state = Arc::new(AppStateInner::new_with_pool(db.clone()).await?);
 
