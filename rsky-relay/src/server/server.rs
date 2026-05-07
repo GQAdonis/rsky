@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{self, BufReader, Write};
+use std::io::{self, BufReader, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -354,7 +354,7 @@ impl Server {
                     // Consume the peeked bytes so we own the socket data.
                     #[expect(clippy::unwrap_used)]
                     let tcp = stream.0.as_mut().unwrap();
-                    let _ = tcp.read(&mut self.buf);
+                    let _unused = tcp.read(&mut self.buf);
                     // If body is larger than what we have, read the remainder.
                     let body_have = len.saturating_sub(offset);
                     let body_need = content_length.saturating_sub(body_have);
@@ -364,7 +364,7 @@ impl Server {
                         let mut extra = vec![0u8; body_need];
                         #[expect(clippy::unwrap_used)]
                         let tcp = stream.0.as_mut().unwrap();
-                        let _ = tcp.read_exact(&mut extra);
+                        let _unused = tcp.read_exact(&mut extra);
                         let mut combined = self.buf[offset..offset + body_have].to_vec();
                         combined.extend_from_slice(&extra);
                         combined
