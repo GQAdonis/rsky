@@ -1,4 +1,4 @@
-use appview_core::error::{AppViewError, Result};
+use appview_core::error::Result;
 use appview_queue::{IndexJob, IndexOperation, IndexQueue};
 use futures::SinkExt;
 use futures::stream::StreamExt;
@@ -307,11 +307,17 @@ impl FirehoseConsumer {
         use rsky_firehose::firehose::read;
         use rsky_lexicon::com::atproto::sync::SubscribeRepos;
 
-        let (_header, event) = match read(data)
-            .map_err(|e| AppViewError::Internal(format!("failed to parse message: {e}")))?
-        {
-            Some(v) => v,
-            None => return Ok(()), // Skip empty messages
+        let (_header, event) = match read(data) {
+            Ok(Some(v)) => v,
+            Ok(None) => return Ok(()), // Skip empty/unknown messages
+            Err(e) => {
+                // Malformed messages from the relay (e.g. negative integer in CBOR header)
+                // must be skipped rather than retried — returning Err here causes the caller
+                // to log the error but the connection stays alive and the relay advances to
+                // the next sequence number automatically.
+                warn!("skipping unparseable firehose message: {e}");
+                return Ok(());
+            }
         };
 
         // Handle different event types
