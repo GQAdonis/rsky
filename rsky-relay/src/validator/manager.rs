@@ -162,17 +162,24 @@ impl<R: IdentityResolver> Manager<R> {
             let handle = tokio::runtime::Handle::try_current()
                 .map_err(|e| sqlx::Error::Protocol(format!("no tokio runtime in persist: {e}")))?;
             handle.block_on(async move {
-                for (host, cursor, latest) in &hosts {
-                    sqlx::query(
-                        "INSERT INTO hosts (host, cursor, latest) VALUES ($1, $2, $3) \
-                         ON CONFLICT(host) DO UPDATE SET cursor = EXCLUDED.cursor, latest = EXCLUDED.latest",
-                    )
-                    .bind(host)
-                    .bind(cursor)
-                    .bind(latest)
-                    .execute(&pool)
-                    .await?;
+                if hosts.is_empty() {
+                    return Ok::<_, sqlx::Error>(());
                 }
+                // Batch all host UPSERTs in a single query using UNNEST to avoid
+                // holding a pool connection for N sequential round-trips.
+                let host_names: Vec<&str> = hosts.iter().map(|(h, _, _)| h.as_str()).collect();
+                let cursors: Vec<i64> = hosts.iter().map(|(_, c, _)| *c).collect();
+                let latests: Vec<DateTime<Utc>> = hosts.iter().map(|(_, _, t)| *t).collect();
+                sqlx::query(
+                    "INSERT INTO hosts (host, cursor, latest) \
+                     SELECT * FROM UNNEST($1::text[], $2::bigint[], $3::timestamptz[]) AS t(host, cursor, latest) \
+                     ON CONFLICT(host) DO UPDATE SET cursor = EXCLUDED.cursor, latest = EXCLUDED.latest",
+                )
+                .bind(&host_names)
+                .bind(&cursors)
+                .bind(&latests)
+                .execute(&pool)
+                .await?;
                 Ok::<_, sqlx::Error>(())
             })
         })?;
