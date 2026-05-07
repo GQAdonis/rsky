@@ -139,10 +139,26 @@ pub fn create_router(state: AppState) -> Router {
         )
         .route("/xrpc/tools.know-me.video.whip", post(webrtc::whip))
         .route("/xrpc/tools.know-me.video.whep", post(webrtc::whep))
+        .route(
+            "/xrpc/tools.knowme.feed.subscribeFeed",
+            get(subscribe_feed_stub),
+        )
         .layer(CorsLayer::permissive())
         .with_state(state)
 }
 
 async fn health() -> &'static str {
     "OK"
+}
+
+/// Stub for tools.knowme.feed.subscribeFeed WebSocket route.
+/// Returns 501 Not Implemented until the full WebSocket feed is built.
+async fn subscribe_feed_stub() -> impl axum::response::IntoResponse {
+    (
+        axum::http::StatusCode::NOT_IMPLEMENTED,
+        axum::Json(serde_json::json!({
+            "error": "NotImplemented",
+            "message": "tools.knowme.feed.subscribeFeed is not yet implemented"
+        })),
+    )
 }
