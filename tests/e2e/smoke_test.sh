@@ -105,7 +105,8 @@ create_post() {
     POST_PAYLOAD=$(jq -n \
         --arg did "$DID" \
         --arg text "$POST_TEXT" \
-        '{repo: $did, collection: "app.bsky.feed.post", record: {"\$type": "app.bsky.feed.post", text: $text, createdAt: (now | strftime("%Y-%m-%dT%H:%M:%S.000Z"))}}')
+        --arg type "app.bsky.feed.post" \
+        '{repo: $did, collection: "app.bsky.feed.post", record: {("$type"): $type, text: $text, createdAt: (now | strftime("%Y-%m-%dT%H:%M:%S.000Z"))}}')
 
     POST_RESPONSE=$(curl -sf -X POST "$PDS_URL/xrpc/com.atproto.repo.createRecord" \
         -H "Content-Type: application/json" \

@@ -92,7 +92,7 @@ pub async fn main() -> Result<()> {
         tracing::info!("creating relay database");
         sqlx::Postgres::create_database(db_url).await?;
     }
-    let pool: PgPool = PgPoolOptions::new().max_connections(10).connect(db_url).await?;
+    let pool: PgPool = PgPoolOptions::new().max_connections(20).connect(db_url).await?;
     sqlx::migrate!("./migrations").run(&pool).await?;
     tracing::info!("database migrations complete");
 
