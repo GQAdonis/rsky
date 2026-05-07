@@ -1,6 +1,6 @@
 FROM lukemathwalker/cargo-chef:latest-rust-1.86 AS chef
 RUN apt-get update && apt-get install -y \
-    pkg-config libssl-dev \
+    pkg-config libssl-dev libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /usr/src/rsky
 
@@ -16,7 +16,7 @@ RUN cargo build --release -p rsky-relay
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y \
-    ca-certificates libssl3 procps \
+    ca-certificates libssl3 libpq5 procps \
     && rm -rf /var/lib/apt/lists/*
 LABEL org.opencontainers.image.source=https://github.com/know-me-tools/rsky
 # WORKDIR is the data directory so relative paths (relay.db, plc_directory.db)

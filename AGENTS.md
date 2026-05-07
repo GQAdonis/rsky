@@ -316,7 +316,27 @@ After each meaningful change:
 - Update CLAUDE.md Known Gotchas table
 - Reference the openspec change ID (e.g., prod-c001) for traceability
 
-### 6. Web Search Before Custom Implementation
+### 6. Rust Lint Enforcement
+
+Before marking **any Rust change** complete:
+
+1. Run `cargo clippy --workspace --all-targets --all-features --fix --allow-dirty` from the relevant workspace root:
+   - Root workspace: run from `/`
+   - rsky-appview: run from `rsky-appview/`
+   - rsky-pdsadmin: run from `rsky-pdsadmin/`
+2. Zero errors required. Warnings should be addressed or explicitly suppressed with `#[allow(...)]` and a comment explaining why.
+3. Always load the relevant `rust-skills` skill before writing Rust code:
+   - `Skill("rust-skills:m01-ownership")` — ownership/borrowing
+   - `Skill("rust-skills:m06-error-handling")` — error handling
+   - `Skill("rust-skills:m07-concurrency")` — async/tokio patterns
+4. Use `cargo geiger` to inspect unsafe usage boundaries when touching any `unsafe` block.
+5. Use `cargo udeps` to identify unused dependencies before adding new ones.
+
+**Audit loop**: Analyze → Patch → Re-run Clippy → Re-analyze → Benchmark → Continue
+
+**Enterprise audit**: For deep crate reviews, load `.claude/skills/rust-enterprise-audit.md` — it applies Microsoft Pragmatic Rust Guidelines, Rust API Guidelines, Clippy pedantic/nursery, and Tokio async best practices.
+
+### 7. Web Search Before Custom Implementation
 
 Before implementing any AT Protocol feature from scratch:
 1. Use Tavily (`mcp__tavily-mcp__tavily_search`) to find current reference implementation
