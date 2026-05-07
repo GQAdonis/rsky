@@ -4,9 +4,8 @@ use std::time::Duration;
 
 // database
 pub static DATABASE_URL: LazyLock<String> = LazyLock::new(|| {
-    env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgres://rsky:rsky@localhost:5432/rsky_relay".to_owned()
-    })
+    env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://rsky:rsky@localhost:5432/rsky_relay".to_owned())
 });
 
 // admin

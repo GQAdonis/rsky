@@ -49,8 +49,7 @@ pub fn from_str_to_utc(str: &str) -> Result<DateTime<UtcOffset>> {
 }
 
 pub fn from_micros_to_utc(micros: i64) -> DateTime<UtcOffset> {
-    DateTime::from_timestamp_micros(micros)
-        .unwrap_or_else(|| DateTime::UNIX_EPOCH)
+    DateTime::from_timestamp_micros(micros).unwrap_or_else(|| DateTime::UNIX_EPOCH)
 }
 
 pub fn from_micros_to_str(micros: i64) -> String {
@@ -58,8 +57,7 @@ pub fn from_micros_to_str(micros: i64) -> String {
 }
 
 pub fn from_millis_to_utc(millis: i64) -> DateTime<UtcOffset> {
-    DateTime::from_timestamp_millis(millis)
-        .unwrap_or_else(|| DateTime::UNIX_EPOCH)
+    DateTime::from_timestamp_millis(millis).unwrap_or_else(|| DateTime::UNIX_EPOCH)
 }
 
 pub fn from_millis_to_str(millis: i64) -> String {

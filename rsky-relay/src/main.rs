@@ -92,10 +92,7 @@ pub async fn main() -> Result<()> {
         tracing::info!("creating relay database");
         sqlx::Postgres::create_database(db_url).await?;
     }
-    let pool: PgPool = PgPoolOptions::new()
-        .max_connections(10)
-        .connect(db_url)
-        .await?;
+    let pool: PgPool = PgPoolOptions::new().max_connections(10).connect(db_url).await?;
     sqlx::migrate!("./migrations").run(&pool).await?;
     tracing::info!("database migrations complete");
 
@@ -145,8 +142,12 @@ pub async fn main() -> Result<()> {
     let (request_crawl_tx, request_crawl_rx) = rtrb::RingBuffer::new(CAPACITY_REQS);
     let (subscribe_repos_tx, subscribe_repos_rx) = rtrb::RingBuffer::new(CAPACITY_REQS);
     let validator = ValidatorManager::new(message_rx, pool.clone())?;
-    let server =
-        Server::new(args.certs.zip(args.private_key), request_crawl_tx, subscribe_repos_tx, pool.clone())?;
+    let server = Server::new(
+        args.certs.zip(args.private_key),
+        request_crawl_tx,
+        subscribe_repos_tx,
+        pool.clone(),
+    )?;
     // Track validator status via AtomicBool so the main loop can detect
     // validator death without owning the JoinHandle (which stays outside the closure).
     let validator_dead = Arc::new(AtomicBool::new(false));
@@ -156,7 +157,8 @@ pub async fn main() -> Result<()> {
         validator_dead_clone.store(true, Ordering::Relaxed);
         result
     });
-    let crawler = CrawlerManager::new(WORKERS_CRAWLERS, &message_tx, request_crawl_rx, pool.clone())?;
+    let crawler =
+        CrawlerManager::new(WORKERS_CRAWLERS, &message_tx, request_crawl_rx, pool.clone())?;
     let publisher = PublisherManager::new(WORKERS_PUBLISHERS, subscribe_repos_rx)?;
     #[expect(clippy::vec_init_then_push)]
     let ret = thread::scope(move |s| {

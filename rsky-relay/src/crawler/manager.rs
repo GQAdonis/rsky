@@ -226,13 +226,9 @@ impl Manager {
             })?;
             handle.block_on(async move {
                 use sqlx::Row as _;
-                let rows = sqlx::query("SELECT host FROM banned_hosts")
-                    .fetch_all(&pool)
-                    .await?;
+                let rows = sqlx::query("SELECT host FROM banned_hosts").fetch_all(&pool).await?;
                 Ok::<_, sqlx::Error>(
-                    rows.into_iter()
-                        .filter_map(|r| r.try_get::<String, _>("host").ok())
-                        .collect()
+                    rows.into_iter().filter_map(|r| r.try_get::<String, _>("host").ok()).collect(),
                 )
             })
         })
@@ -242,9 +238,7 @@ impl Manager {
             if !self.banned.contains(host.as_str()) {
                 tracing::warn!(%host, "host banned, sending disconnect");
                 for worker in &mut *self.workers {
-                    if let Err(err) =
-                        worker.command_tx.push(Command::Disconnect(host.clone()))
-                    {
+                    if let Err(err) = worker.command_tx.push(Command::Disconnect(host.clone())) {
                         tracing::warn!(%host, %err, "unable to send disconnect to worker");
                     }
                 }
