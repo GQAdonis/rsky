@@ -369,9 +369,7 @@ impl Server {
                         combined.extend_from_slice(&extra);
                         combined
                     };
-                    if let Ok(request_crawl) =
-                        serde_json::from_slice::<RequestCrawl>(&body)
-                    {
+                    if let Ok(request_crawl) = serde_json::from_slice::<RequestCrawl>(&body) {
                         if self.is_host_banned(&request_crawl.hostname) {
                             tracing::info!(host = %request_crawl.hostname, "rejecting requestCrawl for banned host");
                             return write_response(
