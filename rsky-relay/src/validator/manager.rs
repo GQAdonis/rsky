@@ -484,16 +484,29 @@ impl<R: IdentityResolver> Drop for Manager<R> {
     fn drop(&mut self) {
         SHUTDOWN.store(true, Ordering::Relaxed);
 
-        // persist() is async; create a temporary single-thread RT for the drop path.
-        // This avoids block_in_place + handle.block_on deadlock that occurs in the main loop.
-        match tokio::runtime::Builder::new_current_thread().enable_all().build() {
-            Ok(rt) => {
-                if let Err(err) = rt.block_on(self.persist()) {
-                    tracing::warn!(%err, "unable to persist host state on drop\n{:#?}", self.hosts);
-                }
+        // persist() is async; we are inside a tokio::spawn task so block_in_place
+        // + Handle::current().block_on() is the correct bridge — creating a *new*
+        // runtime with block_on would panic ("cannot start a runtime from within a runtime").
+        match tokio::runtime::Handle::try_current() {
+            Ok(handle) => {
+                tokio::task::block_in_place(|| {
+                    if let Err(err) = handle.block_on(self.persist()) {
+                        tracing::warn!(%err, "unable to persist host state on drop\n{:#?}", self.hosts);
+                    }
+                });
             }
-            Err(err) => {
-                tracing::warn!(%err, "unable to build runtime for drop persist");
+            Err(_) => {
+                // Not inside a Tokio context — build a minimal runtime for drop-only use.
+                match tokio::runtime::Builder::new_current_thread().enable_all().build() {
+                    Ok(rt) => {
+                        if let Err(err) = rt.block_on(self.persist()) {
+                            tracing::warn!(%err, "unable to persist host state on drop\n{:#?}", self.hosts);
+                        }
+                    }
+                    Err(err) => {
+                        tracing::warn!(%err, "unable to build runtime for drop persist");
+                    }
+                }
             }
         }
 
