@@ -8,6 +8,7 @@ use hashbrown::{HashMap, HashSet};
 use magnetic::Consumer;
 use magnetic::buffer::dynamic::DynamicBufferP2;
 use thiserror::Error;
+use tokio::runtime::Runtime;
 
 use crate::BAN_REFRESH_NEEDED;
 use crate::PgPool;
@@ -54,6 +55,12 @@ pub struct Manager {
     banned: HashSet<String>,
     last_ban_check: Instant,
     pool: PgPool,
+    /// Single-threaded Tokio runtime used to execute async DB queries from
+    /// this synchronous OS thread. The crawler manager runs on a regular
+    /// `thread::spawn` thread that has no Tokio context, so we can't use
+    /// `block_in_place` / `Handle::try_current`. A dedicated `Runtime` with
+    /// `block_on` is the correct bridge pattern.
+    rt: Runtime,
     request_crawl_rx: RequestCrawlReceiver,
     status_rx: StatusReceiver,
 }
@@ -81,6 +88,10 @@ impl Manager {
         let banned = HashSet::new();
         let now = Instant::now();
         let last_ban_check = now.checked_sub(BAN_REFRESH_INTERVAL).unwrap_or(now);
+        // Build a minimal single-threaded runtime for executing async DB
+        // queries from this synchronous crawler-manager OS thread.
+        #[expect(clippy::unwrap_used)]
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
         Ok(Self {
             workers: workers.into_boxed_slice(),
             next_id: 0,
@@ -89,6 +100,7 @@ impl Manager {
             banned,
             last_ban_check,
             pool,
+            rt,
             request_crawl_rx,
             status_rx,
         })
@@ -198,11 +210,8 @@ impl Manager {
     fn get_cursor(&self, host: &str) -> Result<Option<Cursor>, ManagerError> {
         let pool = self.pool.clone();
         let host = host.to_owned();
-        tokio::task::block_in_place(|| {
-            let handle = tokio::runtime::Handle::try_current().map_err(|e| {
-                sqlx::Error::Protocol(format!("no tokio runtime in get_cursor: {e}"))
-            })?;
-            handle.block_on(async move {
+        self.rt
+            .block_on(async move {
                 let row = sqlx::query("SELECT cursor FROM hosts WHERE host = $1")
                     .bind(&host)
                     .fetch_optional(&pool)
@@ -214,25 +223,21 @@ impl Manager {
                     Cursor::from(cursor as u64)
                 }))
             })
-        })
-        .map_err(ManagerError::Database)
+            .map_err(ManagerError::Database)
     }
 
     fn refresh_bans(&mut self) -> Result<(), ManagerError> {
         let pool = self.pool.clone();
-        let new_bans: HashSet<String> = tokio::task::block_in_place(|| {
-            let handle = tokio::runtime::Handle::try_current().map_err(|e| {
-                sqlx::Error::Protocol(format!("no tokio runtime in refresh_bans: {e}"))
-            })?;
-            handle.block_on(async move {
+        let new_bans: HashSet<String> = self
+            .rt
+            .block_on(async move {
                 use sqlx::Row as _;
                 let rows = sqlx::query("SELECT host FROM banned_hosts").fetch_all(&pool).await?;
                 Ok::<_, sqlx::Error>(
                     rows.into_iter().filter_map(|r| r.try_get::<String, _>("host").ok()).collect(),
                 )
             })
-        })
-        .map_err(ManagerError::Database)?;
+            .map_err(ManagerError::Database)?;
 
         for host in &new_bans {
             if !self.banned.contains(host.as_str()) {
