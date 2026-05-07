@@ -1,0 +1,71 @@
+apiVersion: monitoring.googleapis.com/v1
+kind: Rules
+metadata:
+  name: rsky-alerts
+  namespace: atproto
+spec:
+  groups:
+    - name: rsky-relay
+      interval: 60s
+      rules:
+        - alert: RelayDown
+          expr: |
+            absent(relay_validator_published_total)
+          for: 5m
+          labels:
+            severity: critical
+            service: rsky-relay
+          annotations:
+            summary: "rsky-relay is not publishing events"
+            description: "relay_validator_published_total metric has been absent for 5 minutes — relay may be down or not connected."
+
+        - alert: RelayHighDropRate
+          expr: |
+            rate(relay_validator_dropped_total[5m]) > 100
+          for: 5m
+          labels:
+            severity: warning
+            service: rsky-relay
+          annotations:
+            summary: "rsky-relay dropping events at high rate"
+            description: "Relay is dropping more than 100 events/sec for 5 minutes (reason: {{ $labels.reason }})."
+
+    - name: rsky-appview
+      interval: 60s
+      rules:
+        - alert: AppviewDown
+          expr: |
+            absent(appview_requests_total)
+          for: 5m
+          labels:
+            severity: critical
+            service: rsky-appview
+          annotations:
+            summary: "rsky-appview is not receiving requests"
+            description: "appview_requests_total metric has been absent for 5 minutes — appview may be down."
+
+        - alert: AppviewHighErrorRate
+          expr: |
+            rate(appview_requests_total{status=~"5.."}[5m])
+              / rate(appview_requests_total[5m]) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+            service: rsky-appview
+          annotations:
+            summary: "rsky-appview error rate > 5%"
+            description: "More than 5% of appview requests are returning 5xx errors."
+
+    - name: rsky-pds
+      interval: 60s
+      rules:
+        - alert: PDSDown
+          expr: |
+            absent(up{job="rsky-pds"})
+          for: 5m
+          labels:
+            severity: critical
+            service: rsky-pds
+          annotations:
+            summary: "rsky-pds is down"
+            description: "rsky-pds has been unreachable for 5 minutes."

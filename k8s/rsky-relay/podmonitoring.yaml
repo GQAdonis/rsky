@@ -1,0 +1,15 @@
+apiVersion: monitoring.googleapis.com/v1
+kind: PodMonitoring
+metadata:
+  name: rsky-relay
+  namespace: atproto
+  labels:
+    app: rsky-relay
+spec:
+  selector:
+    matchLabels:
+      app: rsky-relay
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s

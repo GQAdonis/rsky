@@ -620,6 +620,13 @@ jobs:
           sed "s|IMAGE_TAG|${{ needs.build-web-client.outputs.image_tag }}|g" \
             k8s/web-client/deployment.yaml | kubectl apply -f -
 
+      # ── Observability ─────────────────────────────────────────────────────
+      - name: Apply monitoring manifests
+        run: |
+          kubectl apply -f k8s/rsky-relay/podmonitoring.yaml
+          kubectl apply -f k8s/rsky-appview/podmonitoring.yaml
+          kubectl apply -f k8s/monitoring/alerting-rules.yaml
+
       # ── Rollout waits ─────────────────────────────────────────────────────
       - name: Wait for rollouts
         run: |
