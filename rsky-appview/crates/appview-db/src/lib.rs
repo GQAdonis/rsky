@@ -8,9 +8,15 @@ pub mod notification;
 pub use sqlx::PgPool;
 
 pub async fn create_pool(database_url: &str, max_connections: u32) -> Result<PgPool, sqlx::Error> {
+    // Disable the statement cache so each query uses the simple/unnamed extended protocol.
+    // This is required for pgbouncer transaction mode — named prepared statements are
+    // connection-scoped and cannot survive across pgbouncer's server-connection reassignments.
+    let connect_options = database_url
+        .parse::<sqlx::postgres::PgConnectOptions>()?
+        .statement_cache_capacity(0);
     sqlx::postgres::PgPoolOptions::new()
         .max_connections(max_connections)
-        .connect(database_url)
+        .connect_with(connect_options)
         .await
 }
 

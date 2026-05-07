@@ -341,8 +341,36 @@ impl Server {
             }
             ("POST", PATH_REQUEST_CRAWL) => {
                 if let Status::Complete(offset) = res {
+                    // Peek may not have captured the full body if it arrived in a later
+                    // TCP segment. Read Content-Length from headers and ensure we have
+                    // all body bytes before deserializing.
+                    let content_length: usize = parser
+                        .headers
+                        .iter()
+                        .find(|h| h.name.eq_ignore_ascii_case("content-length"))
+                        .and_then(|h| std::str::from_utf8(h.value).ok())
+                        .and_then(|s| s.trim().parse().ok())
+                        .unwrap_or(0);
+                    // Consume the peeked bytes so we own the socket data.
+                    #[expect(clippy::unwrap_used)]
+                    let tcp = stream.0.as_mut().unwrap();
+                    let _ = tcp.read(&mut self.buf);
+                    // If body is larger than what we have, read the remainder.
+                    let body_have = len.saturating_sub(offset);
+                    let body_need = content_length.saturating_sub(body_have);
+                    let body: Vec<u8> = if body_need == 0 {
+                        self.buf[offset..offset + body_have].to_vec()
+                    } else {
+                        let mut extra = vec![0u8; body_need];
+                        #[expect(clippy::unwrap_used)]
+                        let tcp = stream.0.as_mut().unwrap();
+                        let _ = tcp.read_exact(&mut extra);
+                        let mut combined = self.buf[offset..offset + body_have].to_vec();
+                        combined.extend_from_slice(&extra);
+                        combined
+                    };
                     if let Ok(request_crawl) =
-                        serde_json::from_reader::<_, RequestCrawl>(&self.buf[offset..len])
+                        serde_json::from_slice::<RequestCrawl>(&body)
                     {
                         if self.is_host_banned(&request_crawl.hostname) {
                             tracing::info!(host = %request_crawl.hostname, "rejecting requestCrawl for banned host");
