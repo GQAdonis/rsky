@@ -99,19 +99,19 @@ fn rocket() -> _ {
 
     let write_db: Map<_, Value> = map! {
         "url" => write_database_url.into(),
-        "pool_size" => 5.into(),
+        "pool_size" => 3.into(),
         "timeout" => 30.into(),
     };
 
     let read_db_1: Map<_, Value> = map! {
         "url" => read_database_url_1.into(),
-        "pool_size" => 5.into(),
+        "pool_size" => 3.into(),
         "timeout" => 30.into(),
     };
 
     let read_db_2: Map<_, Value> = map! {
         "url" => read_database_url_2.into(),
-        "pool_size" => 5.into(),
+        "pool_size" => 3.into(),
         "timeout" => 30.into(),
     };
 

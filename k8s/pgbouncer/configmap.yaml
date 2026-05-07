@@ -7,7 +7,7 @@ data:
   pgbouncer.ini: |
     [databases]
     rsky = host=postgresql port=5432 dbname=rsky pool_size=40
-    rsky_feedgen = host=postgresql port=5432 dbname=rsky_feedgen pool_size=20
+    rsky_feedgen = host=postgresql port=5432 dbname=rsky_feedgen pool_size=40
 
     [pgbouncer]
     listen_addr = 0.0.0.0
@@ -17,7 +17,7 @@ data:
     pool_mode = session
     max_client_conn = 500
     default_pool_size = 20
-    server_idle_timeout = 300
+    server_idle_timeout = 60
     server_connect_timeout = 10
     client_idle_timeout = 0
     log_connections = 0
