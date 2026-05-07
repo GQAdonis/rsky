@@ -449,13 +449,11 @@ impl Server {
         use sqlx::Row as _;
         let pool = self.pool.clone();
         let banned_set = block_on_db(async move {
-            let rows = sqlx::query("SELECT host FROM banned_hosts")
-                .fetch_all(&pool)
-                .await?;
+            let rows = sqlx::query("SELECT host FROM banned_hosts").fetch_all(&pool).await?;
             Ok::<_, sqlx::Error>(
                 rows.into_iter()
                     .filter_map(|r| r.try_get::<String, _>("host").ok())
-                    .collect::<hashbrown::HashSet<String>>()
+                    .collect::<hashbrown::HashSet<String>>(),
             )
         })
         .map_err(|e| eyre!("{e}"))?;
@@ -463,13 +461,11 @@ impl Server {
         let pool = self.pool.clone();
         let raw_rows = block_on_db(async move {
             if let Some(ref after) = cursor {
-                sqlx::query(
-                    "SELECT host, cursor FROM hosts WHERE host > $1 ORDER BY host LIMIT $2",
-                )
-                .bind(after)
-                .bind(limit)
-                .fetch_all(&pool)
-                .await
+                sqlx::query("SELECT host, cursor FROM hosts WHERE host > $1 ORDER BY host LIMIT $2")
+                    .bind(after)
+                    .bind(limit)
+                    .fetch_all(&pool)
+                    .await
             } else {
                 sqlx::query("SELECT host, cursor FROM hosts ORDER BY host LIMIT $1")
                     .bind(limit)
@@ -492,12 +488,7 @@ impl Server {
                     HostStatus::Active
                 };
                 #[expect(clippy::cast_sign_loss)]
-                Host {
-                    account_count: 0,
-                    seq: seq as u64,
-                    hostname,
-                    status,
-                }
+                Host { account_count: 0, seq: seq as u64, hostname, status }
             })
             .collect();
 
@@ -680,10 +671,8 @@ impl Server {
                 let created_at: Option<DateTime<Utc>> = r.try_get("created_at").unwrap_or(None);
                 BannedHost {
                     host,
-                    created_at: created_at.map_or_else(
-                        || "1970-01-01T00:00:00Z".to_owned(),
-                        |ts| ts.to_rfc3339(),
-                    ),
+                    created_at: created_at
+                        .map_or_else(|| "1970-01-01T00:00:00Z".to_owned(), |ts| ts.to_rfc3339()),
                 }
             })
             .collect();

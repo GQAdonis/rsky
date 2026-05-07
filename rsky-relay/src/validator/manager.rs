@@ -10,6 +10,7 @@ use hashbrown::HashMap;
 use hashbrown::hash_map::Entry;
 use thiserror::Error;
 
+use crate::PgPool;
 use crate::SHUTDOWN;
 use crate::config::{HOSTS_WRITE_INTERVAL, LENIENT_VALIDATION};
 use crate::metrics;
@@ -19,7 +20,6 @@ use crate::validator::resolver::{IdentityResolver, Resolver, ResolverError};
 #[cfg(not(feature = "labeler"))]
 use crate::validator::types::RepoState;
 use crate::validator::utils;
-use crate::PgPool;
 
 const SLEEP: Duration = Duration::from_micros(100);
 
@@ -86,9 +86,7 @@ impl<R: IdentityResolver> Manager<R> {
     pub async fn run(mut self) -> Result<(), ManagerError> {
         let mut hosts = 0;
         {
-            let rows = sqlx::query("SELECT host, cursor FROM hosts")
-                .fetch_all(&self.pool)
-                .await?;
+            let rows = sqlx::query("SELECT host, cursor FROM hosts").fetch_all(&self.pool).await?;
             for row in rows {
                 use sqlx::Row as _;
                 let host: String = row.try_get("host")?;
@@ -161,9 +159,8 @@ impl<R: IdentityResolver> Manager<R> {
             .collect();
 
         tokio::task::block_in_place(|| {
-            let handle = tokio::runtime::Handle::try_current().map_err(|e| {
-                sqlx::Error::Protocol(format!("no tokio runtime in persist: {e}"))
-            })?;
+            let handle = tokio::runtime::Handle::try_current()
+                .map_err(|e| sqlx::Error::Protocol(format!("no tokio runtime in persist: {e}")))?;
             handle.block_on(async move {
                 for (host, cursor, latest) in &hosts {
                     sqlx::query(

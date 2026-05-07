@@ -92,9 +92,7 @@ impl Resolver {
                     .fetch_optional(&pool)
                     .await?;
                     Ok::<_, sqlx::Error>(row.and_then(|r| {
-                        r.try_get::<DateTime<Utc>, _>("created_at")
-                            .map(|ts| ts.to_rfc3339())
-                            .ok()
+                        r.try_get::<DateTime<Utc>, _>("created_at").map(|ts| ts.to_rfc3339()).ok()
                     }))
                 })
             })?;
@@ -361,15 +359,13 @@ impl IdentityResolver for Resolver {
 
 fn parse_plc_doc_owned(input: &str) -> Option<OwnedPlcDocument> {
     match serde_json::from_slice::<PlcDocument<'_>>(input.as_bytes()) {
-        Ok(doc) => {
-            Some(OwnedPlcDocument {
-                did: doc.did,
-                cid: doc.cid,
-                nullified: doc.nullified,
-                created_at: doc.created_at,
-                operation: doc.operation.get().to_owned(),
-            })
-        }
+        Ok(doc) => Some(OwnedPlcDocument {
+            did: doc.did,
+            cid: doc.cid,
+            nullified: doc.nullified,
+            created_at: doc.created_at,
+            operation: doc.operation.get().to_owned(),
+        }),
         Err(err) => {
             tracing::debug!(%input, %err, "parse error");
             None
